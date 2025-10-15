@@ -1,0 +1,16 @@
+{
+  "Home": {
+    "title": "Welcome to SeatGoal",
+    "features": {
+      "events": "Browse Events",
+      "eventsDesc": "Find upcoming football games and matches across Israel",
+      "seats": "Choose Your Seat",
+      "seatsDesc": "Interactive seat selection with real-time availability",
+      "checkout": "Easy Checkout",
+      "checkoutDesc": "Secure payment process with instant confirmation",
+      "secure": "100% Secure",
+      "secureDesc": "Your tickets and payment information are always protected"
+    }
+  }
+}
+
