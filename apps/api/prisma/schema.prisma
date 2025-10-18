@@ -1,0 +1,171 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Stadium model
+model Stadium {
+  id        String   @id @default(uuid())
+  name      String
+  nameHe    String   @map("name_he")
+  city      String
+  cityHe    String   @map("city_he")
+  capacity  Int
+  svgMap    String?  @map("svg_map") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  seats  Seat[]
+  events Event[]
+
+  @@map("stadiums")
+}
+
+// Seat model - represents physical seats in a stadium
+model Seat {
+  id        String   @id @default(uuid())
+  stadiumId String   @map("stadium_id")
+  section   String
+  row       String
+  number    String
+  x         Float?   // SVG coordinates
+  y         Float?   // SVG coordinates
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  stadium   Stadium           @relation(fields: [stadiumId], references: [id], onDelete: Cascade)
+  inventory TicketInventory[]
+
+  @@unique([stadiumId, section, row, number])
+  @@index([stadiumId])
+  @@map("seats")
+}
+
+// Event model
+model Event {
+  id              String      @id @default(uuid())
+  stadiumId       String      @map("stadium_id")
+  homeTeam        String      @map("home_team")
+  homeTeamHe      String      @map("home_team_he")
+  awayTeam        String      @map("away_team")
+  awayTeamHe      String      @map("away_team_he")
+  eventDate       DateTime    @map("event_date")
+  saleStartDate   DateTime    @map("sale_start_date")
+  saleEndDate     DateTime    @map("sale_end_date")
+  status          EventStatus @default(UPCOMING)
+  description     String?     @db.Text
+  descriptionHe   String?     @map("description_he") @db.Text
+  imageUrl        String?     @map("image_url")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  stadium   Stadium           @relation(fields: [stadiumId], references: [id])
+  inventory TicketInventory[]
+  orders    Order[]
+
+  @@index([stadiumId])
+  @@index([eventDate])
+  @@index([status])
+  @@map("events")
+}
+
+enum EventStatus {
+  UPCOMING
+  ON_SALE
+  SOLD_OUT
+  CANCELLED
+  COMPLETED
+}
+
+// Ticket Inventory - tracks availability for each seat at each event
+model TicketInventory {
+  id            String       @id @default(uuid())
+  eventId       String       @map("event_id")
+  seatId        String       @map("seat_id")
+  price         Decimal      @db.Decimal(10, 2)
+  status        SeatStatus   @default(AVAILABLE)
+  holdExpiresAt DateTime?    @map("hold_expires_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seat       Seat        @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([eventId, seatId])
+  @@index([eventId])
+  @@index([seatId])
+  @@index([status])
+  @@index([holdExpiresAt])
+  @@map("ticket_inventory")
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  SOLD
+  UNAVAILABLE
+}
+
+// Order model
+model Order {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  eventId         String      @map("event_id")
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  currency        String      @default("ILS")
+  status          OrderStatus @default(PENDING)
+  paymentIntentId String?     @map("payment_intent_id")
+  email           String
+  firstName       String      @map("first_name")
+  lastName        String      @map("last_name")
+  phone           String
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  event      Event       @relation(fields: [eventId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+// Order Items - junction table between orders and ticket inventory
+model OrderItem {
+  id                String   @id @default(uuid())
+  orderId           String   @map("order_id")
+  ticketInventoryId String   @map("ticket_inventory_id")
+  price             Decimal  @db.Decimal(10, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketInventory TicketInventory @relation(fields: [ticketInventoryId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketInventoryId])
+  @@map("order_items")
+}
+
