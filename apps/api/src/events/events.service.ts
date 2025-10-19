@@ -50,7 +50,7 @@ export class EventsService {
 
   async findOne(id: string) {
     const cacheKey = `${this.EVENT_CACHE_PREFIX}${id}`;
-    
+
     // Try cache first
     const cached = await this.redis.get(cacheKey);
     if (cached) {
@@ -83,7 +83,7 @@ export class EventsService {
 
   async getSeatsForEvent(eventId: string) {
     const cacheKey = `${this.SEATS_CACHE_PREFIX}${eventId}`;
-    
+
     // Try cache first
     const cached = await this.redis.get(cacheKey);
     if (cached) {
@@ -119,7 +119,7 @@ export class EventsService {
     const seatsWithRealTimeStatus = await Promise.all(
       inventory.map(async (item) => {
         let status = item.status;
-        
+
         // If status is HELD, check if it's still held in Redis
         if (status === 'HELD') {
           const isHeld = await this.redis.isSeatHeld(eventId, item.seatId);
@@ -147,7 +147,9 @@ export class EventsService {
       eventId,
       seats: seatsWithRealTimeStatus,
       totalSeats: seatsWithRealTimeStatus.length,
-      availableSeats: seatsWithRealTimeStatus.filter(s => s.status === 'AVAILABLE').length,
+      availableSeats: seatsWithRealTimeStatus.filter(
+        (s) => s.status === 'AVAILABLE',
+      ).length,
     };
 
     // Cache the result (short TTL since seat availability changes frequently)
@@ -159,4 +161,3 @@ export class EventsService {
     };
   }
 }
-

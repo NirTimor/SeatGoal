@@ -10,4 +10,3 @@ export class CheckoutController {
     return this.checkoutService.createSession();
   }
 }
-

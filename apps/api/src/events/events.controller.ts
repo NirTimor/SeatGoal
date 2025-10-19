@@ -24,4 +24,3 @@ export class EventsController {
     return this.eventsService.getSeatsForEvent(id);
   }
 }
-

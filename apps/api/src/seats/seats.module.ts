@@ -7,4 +7,3 @@ import { SeatsService } from './seats.service';
   providers: [SeatsService],
 })
 export class SeatsModule {}
-

@@ -10,4 +10,3 @@ export class CartController {
     return this.cartService.holdSeats();
   }
 }
-

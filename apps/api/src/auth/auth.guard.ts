@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { ClerkClient, verifyToken } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 
@@ -38,7 +38,7 @@ export class AuthGuard implements CanActivate {
     try {
       // Verify the Clerk JWT token
       const secretKey = this.configService.get<string>('CLERK_SECRET_KEY');
-      
+
       if (!secretKey) {
         throw new UnauthorizedException('Clerk secret key not configured');
       }
@@ -68,5 +68,3 @@ export class AuthGuard implements CanActivate {
     return type === 'Bearer' ? token : undefined;
   }
 }
-
-

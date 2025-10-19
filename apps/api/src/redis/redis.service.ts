@@ -101,7 +101,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     sessionId: string,
   ): Promise<boolean> {
     const key = `${this.SEAT_HOLD_PREFIX}${eventId}:${seatId}`;
-    
+
     // Use Lua script to ensure we only delete if the session matches
     const script = `
       if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -110,7 +110,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         return 0
       end
     `;
-    
+
     const result = await this.client.eval(script, 1, key, sessionId);
     return result === 1;
   }
@@ -151,7 +151,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     ttl: number = this.DEFAULT_HOLD_TTL,
   ): Promise<boolean> {
     const key = `${this.SEAT_HOLD_PREFIX}${eventId}:${seatId}`;
-    
+
     // Use Lua script to extend only if session matches
     const script = `
       if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -160,7 +160,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         return 0
       end
     `;
-    
+
     const result = await this.client.eval(script, 1, key, sessionId, ttl);
     return result === 1;
   }
@@ -200,13 +200,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     windowSeconds: number = 60,
   ): Promise<boolean> {
     const key = `${this.RATE_LIMIT_PREFIX}${ip}`;
-    
+
     const current = await this.client.incr(key);
-    
+
     if (current === 1) {
       await this.client.expire(key, windowSeconds);
     }
-    
+
     return current <= maxRequests;
   }
 
@@ -216,7 +216,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async get<T>(key: string): Promise<T | null> {
     const value = await this.client.get(key);
     if (!value) return null;
-    
+
     try {
       return JSON.parse(value);
     } catch {
@@ -228,8 +228,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Generic cache set
    */
   async set(key: string, value: any, ttl?: number): Promise<void> {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-    
+    const serialized =
+      typeof value === 'string' ? value : JSON.stringify(value);
+
     if (ttl) {
       await this.client.setex(key, ttl, serialized);
     } else {
@@ -250,8 +251,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async delPattern(pattern: string): Promise<number> {
     const keys = await this.client.keys(pattern);
     if (keys.length === 0) return 0;
-    
+
     return await this.client.del(...keys);
   }
 }
-

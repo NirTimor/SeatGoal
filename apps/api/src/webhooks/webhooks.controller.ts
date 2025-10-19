@@ -10,4 +10,3 @@ export class WebhooksController {
     return this.webhooksService.handlePayment();
   }
 }
-

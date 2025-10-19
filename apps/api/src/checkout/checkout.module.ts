@@ -7,4 +7,3 @@ import { CheckoutService } from './checkout.service';
   providers: [CheckoutService],
 })
 export class CheckoutModule {}
-
