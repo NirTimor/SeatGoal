@@ -12,11 +12,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
+    const redisHost = this.configService.get('REDIS_HOST', 'localhost');
+    const isUpstash = redisHost.includes('upstash.io');
+
     this.client = new Redis({
-      host: this.configService.get('REDIS_HOST', 'localhost'),
+      host: redisHost,
       port: this.configService.get('REDIS_PORT', 6379),
       password: this.configService.get('REDIS_PASSWORD'),
       db: this.configService.get('REDIS_DB', 0),
+      tls: isUpstash ? {} : undefined, // Enable TLS for Upstash
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
         return delay;
@@ -188,6 +192,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async getSeatHoldTTL(eventId: string, seatId: string): Promise<number> {
     const key = `${this.SEAT_HOLD_PREFIX}${eventId}:${seatId}`;
     return await this.client.ttl(key);
+  }
+
+  /**
+   * Get all seats held by a session for an event
+   */
+  async getHeldSeats(eventId: string, sessionId: string): Promise<string[]> {
+    const pattern = `${this.SEAT_HOLD_PREFIX}${eventId}:*`;
+    const keys = await this.client.keys(pattern);
+    const heldSeats: string[] = [];
+
+    for (const key of keys) {
+      const holder = await this.client.get(key);
+      if (holder === sessionId) {
+        // Extract seatId from key
+        const seatId = key.replace(`${this.SEAT_HOLD_PREFIX}${eventId}:`, '');
+        heldSeats.push(seatId);
+      }
+    }
+
+    return heldSeats;
   }
 
   /**

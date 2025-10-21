@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import LocaleSwitcher from '@/components/LocaleSwitcher';
 import UserButton from '@/components/UserButton';
 import { routing } from '@/i18n/routing';
+import Link from 'next/link';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -21,10 +22,16 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </div>
 
-      <div className="relative flex place-items-center">
+      <div className="relative flex place-items-center flex-col gap-6">
         <h1 className="text-4xl font-bold text-center">
           {t('title')}
         </h1>
+        <Link
+          href={`/${locale}/events`}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
+        >
+          {locale === 'he' ? 'צפה באירועים' : 'View Events'}
+        </Link>
       </div>
 
       <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
