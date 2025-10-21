@@ -66,9 +66,7 @@ export class CheckoutService {
     }
 
     if (ticketInventory.length !== heldSeatIds.length) {
-      throw new BadRequestException(
-        'Some held seats are no longer available',
-      );
+      throw new BadRequestException('Some held seats are no longer available');
     }
 
     // Calculate total amount

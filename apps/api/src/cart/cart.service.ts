@@ -24,7 +24,7 @@ export class CartService {
   ) {}
 
   async holdSeats(dto: HoldSeatsDto) {
-    const { eventId, seatIds, userId, sessionId } = dto;
+    const { eventId, seatIds, sessionId } = dto;
 
     // Validate input
     if (!eventId || !seatIds || seatIds.length === 0) {

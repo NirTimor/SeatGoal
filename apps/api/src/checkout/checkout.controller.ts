@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param } from '@nestjs/common';
 import { CheckoutService } from './checkout.service';
 import { User } from '../auth/user.decorator';
 import { Public } from '../auth/public.decorator';
@@ -33,9 +33,7 @@ export class CheckoutController {
 
   @Public()
   @Post('simulate-payment')
-  simulatePayment(
-    @Body() body: { sessionId: string; success?: boolean },
-  ) {
+  simulatePayment(@Body() body: { sessionId: string; success?: boolean }) {
     return this.checkoutService.simulatePayment(
       body.sessionId,
       body.success !== false,
