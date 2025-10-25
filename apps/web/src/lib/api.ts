@@ -58,22 +58,38 @@ class ApiClient {
   ): Promise<{ data: T; cached?: boolean }> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: response.statusText,
-      }));
-      throw new Error(error.message || 'API request failed');
+      if (!response.ok) {
+        let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If we can't parse JSON, use the status text
+          errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      // Handle network errors or other fetch failures
+      throw new Error(`Network error: Unable to connect to API server at ${this.baseUrl}. Please make sure the API server is running.`);
     }
-
-    return response.json();
   }
 
   async getEvents() {
