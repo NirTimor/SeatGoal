@@ -15,15 +15,9 @@ export class EventsService {
   ) {}
 
   async findAll() {
-    // Try cache first
-    const cached = await this.redis.get(this.EVENTS_CACHE_KEY);
-    if (cached) {
-      return {
-        data: cached,
-        cached: true,
-      };
-    }
-
+    // Skip Redis entirely for now to fix timeout issues
+    console.log('Fetching events from database...');
+    
     // Fetch from database
     const events = await this.prisma.event.findMany({
       where: {
@@ -39,9 +33,7 @@ export class EventsService {
       },
     });
 
-    // Cache the result
-    await this.redis.set(this.EVENTS_CACHE_KEY, events, this.CACHE_TTL);
-
+    console.log(`Found ${events.length} events`);
     return {
       data: events,
       cached: false,
@@ -49,17 +41,8 @@ export class EventsService {
   }
 
   async findOne(id: string) {
-    const cacheKey = `${this.EVENT_CACHE_PREFIX}${id}`;
-
-    // Try cache first
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return {
-        data: cached,
-        cached: true,
-      };
-    }
-
+    console.log(`Fetching event ${id} from database...`);
+    
     // Fetch from database
     const event = await this.prisma.event.findUnique({
       where: { id },
@@ -72,9 +55,6 @@ export class EventsService {
       throw new NotFoundException(`Event with ID ${id} not found`);
     }
 
-    // Cache the result
-    await this.redis.set(cacheKey, event, this.CACHE_TTL);
-
     return {
       data: event,
       cached: false,
@@ -82,17 +62,8 @@ export class EventsService {
   }
 
   async getSeatsForEvent(eventId: string) {
-    const cacheKey = `${this.SEATS_CACHE_PREFIX}${eventId}`;
-
-    // Try cache first
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return {
-        data: cached,
-        cached: true,
-      };
-    }
-
+    console.log(`Fetching seats for event ${eventId} from database...`);
+    
     // Verify event exists
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -115,46 +86,27 @@ export class EventsService {
       ],
     });
 
-    // Check Redis for holds and update status accordingly
-    const seatsWithRealTimeStatus = await Promise.all(
-      inventory.map(async (item) => {
-        let status = item.status;
-
-        // If status is HELD, check if it's still held in Redis
-        if (status === 'HELD') {
-          const isHeld = await this.redis.isSeatHeld(eventId, item.seatId);
-          if (!isHeld) {
-            // Hold expired, update to AVAILABLE
-            status = 'AVAILABLE';
-          }
-        }
-
-        return {
-          id: item.id,
-          seatId: item.seatId,
-          section: item.seat.section,
-          row: item.seat.row,
-          number: item.seat.number,
-          x: item.seat.x,
-          y: item.seat.y,
-          price: item.price.toString(),
-          status,
-        };
-      }),
-    );
+    // Skip Redis checks for now - just return the database status
+    const seats = inventory.map((item) => ({
+      id: item.id,
+      seatId: item.seatId,
+      section: item.seat.section,
+      row: item.seat.row,
+      number: item.seat.number,
+      x: item.seat.x,
+      y: item.seat.y,
+      price: item.price.toString(),
+      status: item.status,
+    }));
 
     const result = {
       eventId,
-      seats: seatsWithRealTimeStatus,
-      totalSeats: seatsWithRealTimeStatus.length,
-      availableSeats: seatsWithRealTimeStatus.filter(
-        (s) => s.status === 'AVAILABLE',
-      ).length,
+      seats,
+      totalSeats: seats.length,
+      availableSeats: seats.filter((s) => s.status === 'AVAILABLE').length,
     };
 
-    // Cache the result (short TTL since seat availability changes frequently)
-    await this.redis.set(cacheKey, result, 60); // 1 minute TTL
-
+    console.log(`Found ${seats.length} seats for event ${eventId}`);
     return {
       data: result,
       cached: false,

@@ -25,6 +25,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         const delay = Math.min(times * 50, 2000);
         return delay;
       },
+      lazyConnect: true, // Don't connect immediately
+      maxRetriesPerRequest: 3,
     });
 
     this.client.on('connect', () => {
@@ -32,8 +34,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.on('error', (err) => {
-      console.error('❌ Redis error:', err);
+      console.warn('⚠️ Redis error (continuing without cache):', err.message);
     });
+
+    // Try to connect, but don't fail if Redis is unavailable
+    try {
+      await this.client.connect();
+    } catch (error) {
+      console.warn('⚠️ Redis connection failed, continuing without cache:', error.message);
+    }
   }
 
   async onModuleDestroy() {

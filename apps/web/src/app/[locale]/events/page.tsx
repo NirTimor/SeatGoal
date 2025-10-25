@@ -10,10 +10,19 @@ export default async function EventsPage({
 }) {
   unstable_setRequestLocale(locale);
 
-  // Fetch events server-side
-  const { data: events } = await api.getEvents();
-
   const isHebrew = locale === 'he';
+
+  // Fetch events server-side with error handling
+  let events = [];
+  let error = null;
+  
+  try {
+    const response = await api.getEvents();
+    events = response.data;
+  } catch (err) {
+    console.error('Error fetching events:', err);
+    error = err instanceof Error ? err.message : 'Failed to load events';
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -29,7 +38,28 @@ export default async function EventsPage({
           </p>
         </div>
 
-        {events.length === 0 ? (
+        {error ? (
+          <div className="text-center py-12">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-red-800 mb-2">
+                {isHebrew ? 'שגיאה בטעינת האירועים' : 'Error Loading Events'}
+              </h3>
+              <p className="text-red-600 text-sm mb-4">
+                {error}
+              </p>
+              <p className="text-red-500 text-xs">
+                {isHebrew 
+                  ? 'אנא ודא שהשרת פועל ונסה שוב'
+                  : 'Please make sure the server is running and try again'}
+              </p>
+            </div>
+          </div>
+        ) : events.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">
               {isHebrew
