@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl';
 import { unstable_setRequestLocale } from 'next-intl/server';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import Image from "next/image";
 
 export default async function EventsPage({
   params: { locale },
@@ -13,7 +14,7 @@ export default async function EventsPage({
   const isHebrew = locale === 'he';
 
   // Fetch events server-side with error handling
-  let events = [];
+  let events: any[] = [];
   let error = null;
   
   try {
@@ -78,7 +79,7 @@ export default async function EventsPage({
                 {/* Event Image */}
                 <div className="h-48 bg-gradient-to-br from-blue-500 to-blue-700 relative">
                   {event.imageUrl ? (
-                    <img
+                    <Image
                       src={event.imageUrl}
                       alt={isHebrew ? event.homeTeamHe : event.homeTeam}
                       className="w-full h-full object-cover"
