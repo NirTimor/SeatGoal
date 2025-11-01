@@ -10,6 +10,12 @@ import { SeatsModule } from './seats/seats.module';
 import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { UserProfileModule } from './user-profile/user-profile.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
+import { TransfersModule } from './transfers/transfers.module';
+import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -24,6 +30,12 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CartModule,
     CheckoutModule,
     WebhooksModule,
+    UserProfileModule,
+    SubscriptionsModule,
+    LoyaltyModule,
+    TransfersModule,
+    PaymentMethodsModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
