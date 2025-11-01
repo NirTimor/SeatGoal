@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePaymentMethodDto,
@@ -228,7 +224,10 @@ export class PaymentMethodsService {
     return { message: 'Payment method deleted successfully' };
   }
 
-  async validateCardExpiry(expiryMonth: number, expiryYear: number): Promise<boolean> {
+  async validateCardExpiry(
+    expiryMonth: number,
+    expiryYear: number,
+  ): Promise<boolean> {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
@@ -258,6 +257,7 @@ export class PaymentMethodsService {
 
   private sanitizePaymentMethod(method: any) {
     // Remove sensitive data like providerMethodId from response
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { providerMethodId, ...sanitized } = method;
     return sanitized;
   }
