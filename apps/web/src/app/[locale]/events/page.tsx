@@ -28,6 +28,29 @@ export default async function EventsPage({
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Personal Area Button */}
+        <div className="flex justify-end mb-6">
+          <Link
+            href={`/${locale}/profile`}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+          >
+            <svg
+              className={`w-4 h-4 ${isHebrew ? 'ml-2' : 'mr-2'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+            {isHebrew ? 'אזור אישי' : 'Personal Area'}
+          </Link>
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             {isHebrew ? 'אירועים קרובים' : 'Upcoming Events'}
@@ -82,7 +105,8 @@ export default async function EventsPage({
                     <Image
                       src={event.imageUrl}
                       alt={isHebrew ? event.homeTeamHe : event.homeTeam}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">

@@ -1,0 +1,117 @@
+{
+  "Profile": {
+    "title": "Personal Area",
+    "welcome": "Welcome",
+    "logout": "Logout",
+    "tabs": {
+      "subscriptions": "Subscriptions & Points",
+      "personalDetails": "Personal Details",
+      "orderHistory": "Order History",
+      "expiredSubscriptions": "Expired Subscriptions",
+      "transfers": "Ticket Transfers",
+      "paymentMethods": "Payment Methods"
+    },
+    "subscriptions": {
+      "title": "My Subscriptions",
+      "active": "Active",
+      "expired": "Expired",
+      "season": "Season",
+      "homeGames": "Home Games",
+      "awayGames": "Away Games",
+      "seat": "Seat",
+      "noSubscriptions": "You have no active subscriptions",
+      "renewButton": "Renew Subscription"
+    },
+    "loyalty": {
+      "title": "Loyalty Points",
+      "totalPoints": "Total Points",
+      "tier": "Tier",
+      "awayPoints": "Away Game Points",
+      "homePoints": "Home Game Points",
+      "history": "Points History",
+      "tiers": {
+        "BRONZE": "Bronze",
+        "SILVER": "Silver",
+        "GOLD": "Gold",
+        "PLATINUM": "Platinum"
+      },
+      "pointTypes": {
+        "HOME_GAME": "Home Game",
+        "AWAY_GAME": "Away Game",
+        "SUBSCRIPTION": "Subscription",
+        "BONUS": "Bonus"
+      }
+    },
+    "personalDetails": {
+      "title": "My Personal Details",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "phone": "Phone",
+      "idNumber": "ID Number",
+      "birthDate": "Birth Date",
+      "address": "Address",
+      "gender": "Gender",
+      "genders": {
+        "MALE": "Male",
+        "FEMALE": "Female",
+        "OTHER": "Other"
+      },
+      "saveButton": "Save Changes",
+      "saving": "Saving...",
+      "saved": "Changes saved successfully",
+      "error": "Error saving changes"
+    },
+    "orderHistory": {
+      "title": "My Orders",
+      "orderId": "Order ID",
+      "date": "Date",
+      "event": "Event",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions",
+      "viewDetails": "View Details",
+      "downloadReceipt": "Download Receipt",
+      "noOrders": "No orders",
+      "filters": {
+        "all": "All",
+        "completed": "Completed",
+        "pending": "Pending",
+        "cancelled": "Cancelled",
+        "dateRange": "Date Range"
+      }
+    },
+    "transfers": {
+      "title": "Ticket Transfers",
+      "sent": "Sent",
+      "received": "Received",
+      "to": "To",
+      "from": "From",
+      "status": "Status",
+      "date": "Date",
+      "accept": "Accept",
+      "reject": "Reject",
+      "cancel": "Cancel",
+      "statuses": {
+        "PENDING": "Pending",
+        "ACCEPTED": "Accepted",
+        "REJECTED": "Rejected",
+        "CANCELLED": "Cancelled"
+      },
+      "noTransfers": "No ticket transfers",
+      "acceptConfirm": "Are you sure you want to accept this transfer?",
+      "rejectConfirm": "Are you sure you want to reject this transfer?"
+    },
+    "paymentMethods": {
+      "title": "My Payment Methods",
+      "cardNumber": "Card Number",
+      "expires": "Expires",
+      "default": "Default",
+      "setDefault": "Set as Default",
+      "remove": "Remove",
+      "addNew": "Add Payment Method",
+      "noMethods": "No saved payment methods",
+      "removeConfirm": "Are you sure you want to remove this payment method?"
+    }
+  }
+}

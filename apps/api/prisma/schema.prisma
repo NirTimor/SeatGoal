@@ -159,11 +159,14 @@ model OrderItem {
   orderId           String   @map("order_id")
   ticketInventoryId String   @map("ticket_inventory_id")
   price             Decimal  @db.Decimal(10, 2)
+  attended          Boolean  @default(false) // Track if user attended the event
+  attendedAt        DateTime? @map("attended_at") // When attendance was verified
   createdAt         DateTime @default(now()) @map("created_at")
 
   // Relations
   order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   ticketInventory TicketInventory @relation(fields: [ticketInventoryId], references: [id])
+  transfer        TicketTransfer?
 
   @@index([orderId])
   @@index([ticketInventoryId])
@@ -204,5 +207,176 @@ model VerificationCode {
   @@index([phone])
   @@index([code])
   @@map("verification_codes")
+}
+
+// User Profile - stores detailed user information
+model UserProfile {
+  id              String    @id @default(uuid())
+  clerkUserId     String    @unique @map("clerk_user_id") // Clerk user ID
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  email           String    @unique
+  phone           String?
+  idNumber        String?   @unique @map("id_number") // National ID number (encrypted)
+  birthDate       DateTime? @map("birth_date")
+  gender          Gender?
+  addressLine1    String?   @map("address_line1")
+  addressLine2    String?   @map("address_line2")
+  city            String?
+  postalCode      String?   @map("postal_code")
+  country         String    @default("IL")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions      SeasonSubscription[]
+  loyaltyPoints      LoyaltyPoint[]
+  sentTransfers      TicketTransfer[]     @relation("SentTransfers")
+  receivedTransfers  TicketTransfer[]     @relation("ReceivedTransfers")
+  paymentMethods     PaymentMethod[]
+
+  @@index([clerkUserId])
+  @@index([email])
+  @@map("user_profiles")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+// Season Subscription - user's team subscriptions
+model SeasonSubscription {
+  id             String              @id @default(uuid())
+  userProfileId  String              @map("user_profile_id")
+  team           String              // Team name
+  teamHe         String              @map("team_he") // Hebrew team name
+  season         String              // e.g., "2024-2025"
+  startDate      DateTime            @map("start_date")
+  endDate        DateTime            @map("end_date")
+  status         SubscriptionStatus  @default(ACTIVE)
+  price          Decimal             @db.Decimal(10, 2)
+  seatInfo       Json?               @map("seat_info") // Seat details as JSON
+  autoRenew      Boolean             @default(true) @map("auto_renew")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@index([userProfileId])
+  @@index([status])
+  @@index([endDate])
+  @@map("season_subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+// Loyalty Points - track user loyalty points
+model LoyaltyPoint {
+  id            String           @id @default(uuid())
+  userProfileId String           @map("user_profile_id")
+  points        Int              // Points earned/spent (negative for spending)
+  type          LoyaltyPointType
+  reason        String           // Description of why points were awarded/spent
+  orderId       String?          @map("order_id") // Related order if applicable
+  orderItemId   String?          @map("order_item_id") // Related ticket if applicable
+  eventId       String?          @map("event_id") // Related event if applicable
+  expiresAt     DateTime?        @map("expires_at") // Points expiration date
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@index([userProfileId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("loyalty_points")
+}
+
+enum LoyaltyPointType {
+  AWAY_GAME_PURCHASE    // Bought ticket for away game
+  HOME_GAME_ATTENDANCE  // Attended home game (verified)
+  SUBSCRIPTION_BONUS    // Bonus for season subscription
+  REFERRAL              // Referred a friend
+  REDEEMED              // Points spent/redeemed
+  EXPIRED               // Points expired
+  ADMIN_ADJUSTMENT      // Manual adjustment by admin
+}
+
+// Ticket Transfer - manage ticket transfers between users
+model TicketTransfer {
+  id              String         @id @default(uuid())
+  orderItemId     String         @unique @map("order_item_id")
+  senderProfileId String         @map("sender_profile_id")
+  receiverEmail   String         @map("receiver_email")
+  receiverProfileId String?      @map("receiver_profile_id")
+  status          TransferStatus @default(PENDING)
+  message         String?        @db.Text // Optional message from sender
+  expiresAt       DateTime       @map("expires_at") // Transfer offer expiration
+  acceptedAt      DateTime?      @map("accepted_at")
+  rejectedAt      DateTime?      @map("rejected_at")
+  cancelledAt     DateTime?      @map("cancelled_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  orderItem       OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  sender          UserProfile  @relation("SentTransfers", fields: [senderProfileId], references: [id], onDelete: Cascade)
+  receiver        UserProfile? @relation("ReceivedTransfers", fields: [receiverProfileId], references: [id])
+
+  @@index([senderProfileId])
+  @@index([receiverProfileId])
+  @@index([receiverEmail])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("ticket_transfers")
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+// Payment Method - store user's saved payment methods
+model PaymentMethod {
+  id              String             @id @default(uuid())
+  userProfileId   String             @map("user_profile_id")
+  type            PaymentMethodType
+  provider        String             @default("stripe") // stripe, paypal, etc.
+  last4           String             // Last 4 digits of card
+  brand           String?            // visa, mastercard, etc.
+  expiryMonth     Int?               @map("expiry_month")
+  expiryYear      Int?               @map("expiry_year")
+  holderName      String?            @map("holder_name")
+  isDefault       Boolean            @default(false) @map("is_default")
+  providerMethodId String            @map("provider_method_id") // Stripe payment method ID
+  billingAddress  Json?              @map("billing_address") // Billing address as JSON
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@index([userProfileId])
+  @@index([isDefault])
+  @@map("payment_methods")
+}
+
+enum PaymentMethodType {
+  CARD
+  PAYPAL
+  BANK_ACCOUNT
+  DIGITAL_WALLET
 }
 

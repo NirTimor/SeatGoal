@@ -1,0 +1,117 @@
+{
+  "Profile": {
+    "title": "אזור אישי",
+    "welcome": "ברוך הבא",
+    "logout": "התנתק",
+    "tabs": {
+      "subscriptions": "מנויים ונקודות",
+      "personalDetails": "פרטים אישיים",
+      "orderHistory": "היסטוריית הזמנות",
+      "expiredSubscriptions": "מנויים שפגו",
+      "transfers": "העברת כרטיסים",
+      "paymentMethods": "אמצעי תשלום"
+    },
+    "subscriptions": {
+      "title": "המנויים שלי",
+      "active": "פעיל",
+      "expired": "פג תוקף",
+      "season": "עונה",
+      "homeGames": "משחקי בית",
+      "awayGames": "משחקי חוץ",
+      "seat": "מושב",
+      "noSubscriptions": "אין לך מנויים פעילים",
+      "renewButton": "חדש מנוי"
+    },
+    "loyalty": {
+      "title": "נקודות נאמנות",
+      "totalPoints": "סה\"כ נקודות",
+      "tier": "דרגה",
+      "awayPoints": "נקודות משחקי חוץ",
+      "homePoints": "נקודות משחקי בית",
+      "history": "היסטוריית נקודות",
+      "tiers": {
+        "BRONZE": "ברונזה",
+        "SILVER": "כסף",
+        "GOLD": "זהב",
+        "PLATINUM": "פלטינום"
+      },
+      "pointTypes": {
+        "HOME_GAME": "משחק בית",
+        "AWAY_GAME": "משחק חוץ",
+        "SUBSCRIPTION": "מנוי",
+        "BONUS": "בונוס"
+      }
+    },
+    "personalDetails": {
+      "title": "הפרטים האישיים שלי",
+      "firstName": "שם פרטי",
+      "lastName": "שם משפחה",
+      "email": "אימייל",
+      "phone": "טלפון",
+      "idNumber": "מספר תעודת זהות",
+      "birthDate": "תאריך לידה",
+      "address": "כתובת",
+      "gender": "מין",
+      "genders": {
+        "MALE": "זכר",
+        "FEMALE": "נקבה",
+        "OTHER": "אחר"
+      },
+      "saveButton": "שמור שינויים",
+      "saving": "שומר...",
+      "saved": "השינויים נשמרו בהצלחה",
+      "error": "שגיאה בשמירת השינויים"
+    },
+    "orderHistory": {
+      "title": "ההזמנות שלי",
+      "orderId": "מספר הזמנה",
+      "date": "תאריך",
+      "event": "אירוע",
+      "amount": "סכום",
+      "status": "סטטוס",
+      "actions": "פעולות",
+      "viewDetails": "הצג פרטים",
+      "downloadReceipt": "הורד קבלה",
+      "noOrders": "אין הזמנות",
+      "filters": {
+        "all": "הכל",
+        "completed": "הושלם",
+        "pending": "ממתין",
+        "cancelled": "בוטל",
+        "dateRange": "טווח תאריכים"
+      }
+    },
+    "transfers": {
+      "title": "העברות כרטיסים",
+      "sent": "שנשלחו",
+      "received": "שהתקבלו",
+      "to": "אל",
+      "from": "מאת",
+      "status": "סטטוס",
+      "date": "תאריך",
+      "accept": "קבל",
+      "reject": "דחה",
+      "cancel": "בטל",
+      "statuses": {
+        "PENDING": "ממתין",
+        "ACCEPTED": "התקבל",
+        "REJECTED": "נדחה",
+        "CANCELLED": "בוטל"
+      },
+      "noTransfers": "אין העברות כרטיסים",
+      "acceptConfirm": "האם אתה בטוח שברצונך לקבל העברה זו?",
+      "rejectConfirm": "האם אתה בטוח שברצונך לדחות העברה זו?"
+    },
+    "paymentMethods": {
+      "title": "אמצעי התשלום שלי",
+      "cardNumber": "מספר כרטיס",
+      "expires": "תוקף",
+      "default": "ברירת מחדל",
+      "setDefault": "הגדר כברירת מחדל",
+      "remove": "הסר",
+      "addNew": "הוסף אמצעי תשלום",
+      "noMethods": "אין אמצעי תשלום שמורים",
+      "removeConfirm": "האם אתה בטוח שברצונך להסיר אמצעי תשלום זה?"
+    }
+  }
+}
