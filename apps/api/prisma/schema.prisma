@@ -135,7 +135,8 @@ model Order {
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  event      Event       @relation(fields: [eventId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  event     Event         @relation(fields: [eventId], references: [id])
   orderItems OrderItem[]
 
   @@index([userId])
@@ -167,5 +168,41 @@ model OrderItem {
   @@index([orderId])
   @@index([ticketInventoryId])
   @@map("order_items")
+}
+
+// User model for authentication
+model User {
+  id          String   @id @default(uuid())
+  email       String?  @unique
+  phone       String?  @unique
+  idCard      String   // Israeli ID card number
+  firstName   String?  @map("first_name")
+  lastName    String?  @map("last_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  orders Order[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("users")
+}
+
+// Verification codes for phone/email verification
+model VerificationCode {
+  id        String   @id @default(uuid())
+  email     String?
+  phone     String?
+  idCard    String   @map("id_card")
+  code      String
+  expiresAt DateTime @map("expires_at")
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([phone])
+  @@index([code])
+  @@map("verification_codes")
 }
 

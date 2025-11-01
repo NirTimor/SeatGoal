@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { verifyToken } from '@clerk/backend';
+import { JwtService } from '@nestjs/jwt';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    private configService: ConfigService,
+    private jwtService: JwtService,
     private reflector: Reflector,
   ) {}
 
@@ -36,22 +36,13 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      // Verify the Clerk JWT token
-      const secretKey = this.configService.get<string>('CLERK_SECRET_KEY');
-
-      if (!secretKey) {
-        throw new UnauthorizedException('Clerk secret key not configured');
-      }
-
-      const payload = await verifyToken(token, {
-        secretKey,
-      });
+      const payload = await this.jwtService.verifyAsync(token);
 
       // Attach user info to request
       request.user = {
         userId: payload.sub,
-        sessionId: payload.sid,
-        ...payload,
+        email: payload.email,
+        phone: payload.phone,
       };
 
       return true;

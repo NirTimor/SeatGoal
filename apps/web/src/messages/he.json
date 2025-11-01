@@ -11,6 +11,32 @@
       "secure": "100% מאובטח",
       "secureDesc": "הכרטיסים ומידע התשלום שלך מוגנים תמיד"
     }
+  },
+  "Auth": {
+    "title": "התחברות / הרשמה",
+    "loginTitle": "התחברות",
+    "registerTitle": "הרשמה",
+    "instruction": "לצורך ביצוע פעולה זו יש להיות רשומים לאתר.",
+    "email": "אימייל",
+    "phone": "טלפון נייד",
+    "idCard": "תעודת זהות",
+    "idCardPlaceholder": "הזן מספר תעודת זהות",
+    "emailPlaceholder": "your@email.com",
+    "phonePlaceholder": "050-1234567",
+    "continue": "המשך",
+    "sending": "שולח...",
+    "verificationCode": "קוד אימות",
+    "codeSentTo": "קוד נשלח ל-{{method}}",
+    "verify": "אימות",
+    "verifying": "מאמת...",
+    "back": "חזור",
+    "signIn": "התחבר",
+    "signOut": "התנתק",
+    "myAccount": "החשבון שלי",
+    "noAccount": "אין לך חשבון?",
+    "registerHere": "הירשם כאן!",
+    "haveAccount": "יש לך כבר חשבון?",
+    "loginHere": "התחבר!"
   }
 }
 

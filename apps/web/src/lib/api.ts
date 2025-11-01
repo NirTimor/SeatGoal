@@ -58,11 +58,15 @@ class ApiClient {
   ): Promise<{ data: T; cached?: boolean }> {
     const url = `${this.baseUrl}${endpoint}`;
 
+    // Get auth token from localStorage if available
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...options?.headers,
         },
       });

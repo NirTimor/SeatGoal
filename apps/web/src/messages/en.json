@@ -11,6 +11,32 @@
       "secure": "100% Secure",
       "secureDesc": "Your tickets and payment information are always protected"
     }
+  },
+  "Auth": {
+    "title": "Login / Registration",
+    "loginTitle": "Login",
+    "registerTitle": "Register",
+    "instruction": "To perform this action, you must be registered on the site.",
+    "email": "Email",
+    "phone": "Mobile Phone",
+    "idCard": "ID Card",
+    "idCardPlaceholder": "Enter your ID card number",
+    "emailPlaceholder": "your@email.com",
+    "phonePlaceholder": "050-1234567",
+    "continue": "Continue",
+    "sending": "Sending...",
+    "verificationCode": "Verification Code",
+    "codeSentTo": "Code sent to {{method}}",
+    "verify": "Verify",
+    "verifying": "Verifying...",
+    "back": "Back",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "myAccount": "My Account",
+    "noAccount": "Don't have an account?",
+    "registerHere": "Register here!",
+    "haveAccount": "Already have an account?",
+    "loginHere": "Log In!"
   }
 }
 
