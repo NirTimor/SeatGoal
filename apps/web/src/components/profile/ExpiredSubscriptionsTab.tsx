@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useState, useEffect, useCallback } from 'react';
 import ProfileCard from './ProfileCard';
 import EmptyState from './EmptyState';
 import { profileEndpoints, API_URL } from '@/lib/api-profile';
@@ -13,20 +12,15 @@ interface ExpiredSubscriptionsTabProps {
 }
 
 export default function ExpiredSubscriptionsTab({ locale }: ExpiredSubscriptionsTabProps) {
-  const { getToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
   const t = locale === 'he' ? profileTranslationsHe.Profile : profileTranslationsEn.Profile;
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       const response = await profileEndpoints.getSeasonSubscriptions(API_URL, token);
@@ -39,7 +33,11 @@ export default function ExpiredSubscriptionsTab({ locale }: ExpiredSubscriptions
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (

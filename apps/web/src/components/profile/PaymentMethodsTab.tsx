@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useState, useEffect, useCallback } from 'react';
 import ProfileCard from './ProfileCard';
 import EmptyState from './EmptyState';
 import { profileEndpoints, API_URL } from '@/lib/api-profile';
@@ -13,20 +12,15 @@ interface PaymentMethodsTabProps {
 }
 
 export default function PaymentMethodsTab({ locale }: PaymentMethodsTabProps) {
-  const { getToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
   const t = locale === 'he' ? profileTranslationsHe.Profile : profileTranslationsEn.Profile;
 
-  useEffect(() => {
-    loadPaymentMethods();
-  }, []);
-
-  const loadPaymentMethods = async () => {
+  const loadPaymentMethods = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       const response = await profileEndpoints.getPaymentMethods(API_URL, token);
@@ -36,11 +30,15 @@ export default function PaymentMethodsTab({ locale }: PaymentMethodsTabProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPaymentMethods();
+  }, [loadPaymentMethods]);
 
   const handleSetDefault = async (id: string) => {
     try {
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       await profileEndpoints.setDefaultPaymentMethod(API_URL, id, token);
@@ -54,7 +52,7 @@ export default function PaymentMethodsTab({ locale }: PaymentMethodsTabProps) {
     if (!confirm(t.paymentMethods.removeConfirm)) return;
 
     try {
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       await profileEndpoints.removePaymentMethod(API_URL, id, token);

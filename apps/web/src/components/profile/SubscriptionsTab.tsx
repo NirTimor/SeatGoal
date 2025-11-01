@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useState, useEffect, useCallback } from 'react';
 import ProfileCard from './ProfileCard';
 import StatsCard from './StatsCard';
 import EmptyState from './EmptyState';
@@ -14,7 +13,6 @@ interface SubscriptionsTabProps {
 }
 
 export default function SubscriptionsTab({ locale }: SubscriptionsTabProps) {
-  const { getToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [loyaltyData, setLoyaltyData] = useState<any>(null);
@@ -22,14 +20,10 @@ export default function SubscriptionsTab({ locale }: SubscriptionsTabProps) {
   const t = locale === 'he' ? profileTranslationsHe.Profile : profileTranslationsEn.Profile;
   const isRTL = locale === 'he';
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       const [subsResponse, loyaltyResponse] = await Promise.all([
@@ -44,7 +38,11 @@ export default function SubscriptionsTab({ locale }: SubscriptionsTabProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (

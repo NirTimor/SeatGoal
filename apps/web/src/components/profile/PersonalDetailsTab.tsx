@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth, useUser } from '@clerk/nextjs';
+import { useState, useEffect, useCallback } from 'react';
 import ProfileCard from './ProfileCard';
 import { profileEndpoints, API_URL } from '@/lib/api-profile';
 import profileTranslationsHe from '@/messages/profile-he.json';
@@ -12,8 +11,6 @@ interface PersonalDetailsTabProps {
 }
 
 export default function PersonalDetailsTab({ locale }: PersonalDetailsTabProps) {
-  const { getToken } = useAuth();
-  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -31,24 +28,33 @@ export default function PersonalDetailsTab({ locale }: PersonalDetailsTabProps) 
     gender: '',
   });
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
+
+      // Decode JWT to get user info
+      let userFromToken: any = {};
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userFromToken = {
+          email: payload.email,
+          phone: payload.phone,
+          firstName: payload.email?.split('@')[0] || payload.phone || '',
+        };
+      } catch (err) {
+        console.error('Failed to decode token:', err);
+      }
 
       const response = await profileEndpoints.getUserProfile(API_URL, token);
       const userData = response.data;
 
       setFormData({
-        firstName: userData.firstName || user?.firstName || '',
-        lastName: userData.lastName || user?.lastName || '',
-        email: userData.email || user?.emailAddresses[0]?.emailAddress || '',
-        phone: userData.phone || '',
+        firstName: userData.firstName || userFromToken.firstName || '',
+        lastName: userData.lastName || '',
+        email: userData.email || userFromToken.email || '',
+        phone: userData.phone || userFromToken.phone || '',
         idNumber: userData.idNumber || '',
         birthDate: userData.birthDate || '',
         address: userData.address || '',
@@ -59,7 +65,11 @@ export default function PersonalDetailsTab({ locale }: PersonalDetailsTabProps) 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -92,7 +102,7 @@ export default function PersonalDetailsTab({ locale }: PersonalDetailsTabProps) 
       setSaving(true);
       setMessage(null);
 
-      const token = await getToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) return;
 
       await profileEndpoints.updateUserProfile(

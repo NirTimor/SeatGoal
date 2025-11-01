@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useState, useEffect } from 'react';
 import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import SubscriptionsTab from '@/components/profile/SubscriptionsTab';
 import PersonalDetailsTab from '@/components/profile/PersonalDetailsTab';
 import OrderHistoryTab from '@/components/profile/OrderHistoryTab';
@@ -15,12 +15,38 @@ import profileTranslationsEn from '@/messages/profile-en.json';
 type TabKey = 'subscriptions' | 'personalDetails' | 'orderHistory' | 'expiredSubscriptions' | 'transfers' | 'paymentMethods';
 
 export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
   const locale = useLocale();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('subscriptions');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const t = locale === 'he' ? profileTranslationsHe.Profile : profileTranslationsEn.Profile;
   const isRTL = locale === 'he';
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          // Decode JWT token to get user info
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          setUser({
+            email: payload.email,
+            phone: payload.phone,
+            emailAddresses: payload.email ? [{ emailAddress: payload.email }] : [],
+            firstName: payload.email?.split('@')[0] || payload.phone || 'User',
+          });
+        } catch (error) {
+          console.error('Failed to decode token:', error);
+          localStorage.removeItem('auth_token');
+        }
+      }
+      setIsLoaded(true);
+    };
+
+    checkAuth();
+  }, []);
 
   if (!isLoaded) {
     return (
@@ -35,6 +61,12 @@ export default function ProfilePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Please sign in to view your profile</h1>
+          <button
+            onClick={() => router.push(`/${locale}/auth`)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Sign In
+          </button>
         </div>
       </div>
     );
