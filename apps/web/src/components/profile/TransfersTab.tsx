@@ -142,7 +142,7 @@ export default function TransfersTab({ locale }: TransfersTabProps) {
                     </p>
                   </div>
                   <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadge(transfer.status)}`}>
-                    {t.transfers.statuses[transfer.status]}
+                    {t.transfers.statuses[transfer.status as keyof typeof t.transfers.statuses]}
                   </span>
                 </div>
 

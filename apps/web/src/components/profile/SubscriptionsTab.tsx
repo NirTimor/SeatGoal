@@ -66,7 +66,7 @@ export default function SubscriptionsTab({ locale }: SubscriptionsTabProps) {
             <StatsCard
               title={t.loyalty.totalPoints}
               value={loyaltyData.totalPoints || 0}
-              subtitle={`${t.loyalty.tier}: ${t.loyalty.tiers[loyaltyData.tier] || loyaltyData.tier}`}
+              subtitle={`${t.loyalty.tier}: ${t.loyalty.tiers[loyaltyData.tier as keyof typeof t.loyalty.tiers] || loyaltyData.tier}`}
             />
             <StatsCard
               title={t.loyalty.homePoints}
