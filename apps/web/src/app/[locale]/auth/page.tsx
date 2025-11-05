@@ -23,25 +23,18 @@ export default function AuthPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/auth/send-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...(authType === 'email' ? { email } : { phone }),
-          idCard,
-        }),
-      });
+      // Bypass OTP verification for now - go directly to profile
+      // Create a mock token
+      const mockToken = 'mock_token_' + Date.now();
+      localStorage.setItem('auth_token', mockToken);
 
-      const data = await response.json();
+      // Store user info for profile page
+      localStorage.setItem('user_email', email);
+      localStorage.setItem('user_phone', phone);
+      localStorage.setItem('user_idCard', idCard);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send verification code');
-      }
-
-      // Move to verification step
-      setStep('verification');
+      // Redirect to profile page
+      router.push('/profile');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -71,9 +64,9 @@ export default function AuthPage() {
         throw new Error(data.message || 'Invalid verification code');
       }
 
-      // Success! Store token and redirect
+      // Success! Store token and redirect to profile
       localStorage.setItem('auth_token', data.token);
-      router.push('/');
+      router.push('/profile');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {

@@ -30,15 +30,18 @@ export default function ProfilePage() {
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          // Call the backend to validate token and get user info
-          const response = await api.getProfile();
+          // For mock authentication, use stored data
+          const email = localStorage.getItem('user_email');
+          const phone = localStorage.getItem('user_phone');
+          const idCard = localStorage.getItem('user_idCard');
+
           setUser({
-            email: response.data.email,
-            phone: response.data.phone,
-            emailAddresses: response.data.email ? [{ emailAddress: response.data.email }] : [],
-            firstName: response.data.firstName || response.data.email?.split('@')[0] || response.data.phone || 'User',
-            lastName: response.data.lastName,
-            id: response.data.id,
+            email: email || '',
+            phone: phone || '',
+            emailAddresses: email ? [{ emailAddress: email }] : [],
+            firstName: email?.split('@')[0] || phone || 'User',
+            lastName: '',
+            id: idCard || 'mock_id',
           });
         } catch (error) {
           console.error('Failed to fetch profile:', error);
