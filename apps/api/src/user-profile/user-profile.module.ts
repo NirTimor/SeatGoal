@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { UserProfileController } from './user-profile.controller';
 import { UserProfileService } from './user-profile.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [UserProfileController],
   providers: [UserProfileService],
   exports: [UserProfileService],

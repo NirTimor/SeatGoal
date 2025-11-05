@@ -27,6 +27,6 @@ import { AuthController } from './auth.controller';
       useClass: AuthGuard,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

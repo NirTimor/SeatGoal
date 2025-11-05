@@ -26,7 +26,7 @@
     "continue": "Continue",
     "sending": "Sending...",
     "verificationCode": "Verification Code",
-    "codeSentTo": "Code sent to {{method}}",
+    "codeSentTo": "Code sent to {method}",
     "verify": "Verify",
     "verifying": "Verifying...",
     "back": "Back",

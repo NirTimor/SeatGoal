@@ -11,6 +11,7 @@ import TransfersTab from '@/components/profile/TransfersTab';
 import PaymentMethodsTab from '@/components/profile/PaymentMethodsTab';
 import profileTranslationsHe from '@/messages/profile-he.json';
 import profileTranslationsEn from '@/messages/profile-en.json';
+import { api } from '@/lib/api';
 
 type TabKey = 'subscriptions' | 'personalDetails' | 'orderHistory' | 'expiredSubscriptions' | 'transfers' | 'paymentMethods';
 
@@ -25,28 +26,32 @@ export default function ProfilePage() {
   const isRTL = locale === 'he';
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          // Decode JWT token to get user info
-          const payload = JSON.parse(atob(token.split('.')[1]));
+          // Call the backend to validate token and get user info
+          const response = await api.getProfile();
           setUser({
-            email: payload.email,
-            phone: payload.phone,
-            emailAddresses: payload.email ? [{ emailAddress: payload.email }] : [],
-            firstName: payload.email?.split('@')[0] || payload.phone || 'User',
+            email: response.data.email,
+            phone: response.data.phone,
+            emailAddresses: response.data.email ? [{ emailAddress: response.data.email }] : [],
+            firstName: response.data.firstName || response.data.email?.split('@')[0] || response.data.phone || 'User',
+            lastName: response.data.lastName,
+            id: response.data.id,
           });
         } catch (error) {
-          console.error('Failed to decode token:', error);
+          console.error('Failed to fetch profile:', error);
+          // Token is invalid or expired, clear it
           localStorage.removeItem('auth_token');
+          router.push(`/${locale}/auth`);
         }
       }
       setIsLoaded(true);
     };
 
     checkAuth();
-  }, []);
+  }, [locale, router]);
 
   if (!isLoaded) {
     return (

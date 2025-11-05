@@ -239,6 +239,19 @@ class ApiClient {
       body: JSON.stringify({ sessionId, success }),
     });
   }
+
+  // Auth endpoints
+  async getProfile() {
+    return this.fetch<{
+      id: string;
+      email?: string;
+      phone?: string;
+      firstName?: string;
+      lastName?: string;
+      idNumber?: string;
+      createdAt: string;
+    }>('/auth/me');
+  }
 }
 
 export const api = new ApiClient();
