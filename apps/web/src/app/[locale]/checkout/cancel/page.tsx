@@ -1,27 +1,24 @@
 import { unstable_setRequestLocale } from 'next-intl/server';
 import Link from 'next/link';
 
-export default async function SuccessPage({
+export default async function CancelPage({
   params: { locale },
   searchParams,
 }: {
   params: { locale: string };
-  searchParams: { order?: string; session_id?: string; order_id?: string };
+  searchParams: { order_id?: string };
 }) {
   unstable_setRequestLocale(locale);
   const isHebrew = locale === 'he';
-
-  // Handle both simulation (order param) and Stripe (order_id param)
-  const orderId = searchParams.order_id || searchParams.order;
-  const stripeSessionId = searchParams.session_id;
+  const { order_id: orderId } = searchParams;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
-        {/* Success Icon */}
-        <div className="inline-block p-4 bg-green-100 rounded-full mb-6">
+        {/* Warning Icon */}
+        <div className="inline-block p-4 bg-yellow-100 rounded-full mb-6">
           <svg
-            className="w-16 h-16 text-green-600"
+            className="w-16 h-16 text-yellow-600"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -30,30 +27,20 @@ export default async function SuccessPage({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M5 13l4 4L19 7"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
             />
           </svg>
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          {isHebrew ? 'התשלום בוצע בהצלחה!' : 'Payment Successful!'}
+          {isHebrew ? 'התשלום בוטל' : 'Payment Cancelled'}
         </h1>
 
         <p className="text-gray-600 mb-6">
           {isHebrew
-            ? 'ההזמנה שלך אושרה. הכרטיסים נשלחו לכתובת הדוא"ל שלך.'
-            : 'Your order has been confirmed. Tickets have been sent to your email.'}
+            ? 'ביטלת את תהליך התשלום. המושבים שהוחזקו עדיין שמורים עבורך.'
+            : 'You cancelled the payment process. Your held seats are still reserved for you.'}
         </p>
-
-        {stripeSessionId && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-800">
-              {isHebrew
-                ? '✓ התשלום עובד דרך Stripe בהצלחה'
-                : '✓ Payment processed securely via Stripe'}
-            </p>
-          </div>
-        )}
 
         {orderId && (
           <div className="bg-gray-100 rounded-lg p-4 mb-6">
@@ -66,18 +53,26 @@ export default async function SuccessPage({
           </div>
         )}
 
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-blue-800">
+            {isHebrew
+              ? '💡 טיפ: המושבים שמורים עבורך למשך 10 דקות. תוכל לחזור ולהשלים את הרכישה.'
+              : '💡 Tip: Your seats are reserved for 10 minutes. You can go back and complete your purchase.'}
+          </p>
+        </div>
+
         <div className="space-y-3">
-          <Link
-            href={`/${locale}/events`}
+          <button
+            onClick={() => window.history.back()}
             className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
           >
-            {isHebrew ? 'צפה באירועים נוספים' : 'Browse More Events'}
-          </Link>
+            {isHebrew ? 'חזור לתשלום' : 'Back to Checkout'}
+          </button>
           <Link
-            href={`/${locale}`}
+            href={`/${locale}/events`}
             className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 rounded-lg transition-colors duration-200"
           >
-            {isHebrew ? 'חזור לדף הבית' : 'Back to Home'}
+            {isHebrew ? 'חזור לאירועים' : 'Back to Events'}
           </Link>
         </div>
       </div>

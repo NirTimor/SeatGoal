@@ -3,8 +3,10 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { StripeService } from '../stripe/stripe.service';
 
 interface CreateCheckoutSessionDto {
   eventId: string;
@@ -21,6 +23,8 @@ export class CheckoutService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
+    private stripe: StripeService,
+    private config: ConfigService,
   ) {}
 
   async createSession(dto: CreateCheckoutSessionDto) {
@@ -112,29 +116,70 @@ export class CheckoutService {
       },
     });
 
-    // For MVP, we'll simulate a payment process
-    // In production, this would integrate with Stripe/PayPal
-    // and return a redirectUrl to the payment provider
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
 
-    // Simulate payment session creation
-    const paymentSessionId = `sim_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    // Try to use Stripe if configured, otherwise fallback to simulation
+    let checkoutUrl: string;
+    let paymentSessionId: string;
 
-    // Store payment session info in Redis (5 minutes)
-    await this.redis.set(
-      `payment:session:${paymentSessionId}`,
-      {
-        orderId: order.id,
-        sessionId,
-        eventId,
-        userId,
-        totalAmount: totalAmount.toString(),
-      },
-      300, // 5 minutes
-    );
+    if (this.stripe.isConfigured()) {
+      // Use Stripe for payment processing
+      const seatDetails = ticketInventory
+        .map((item) => `${item.seat.section}-${item.seat.row}-${item.seat.number}`)
+        .join(', ');
 
-    // For MVP: Create a mock checkout URL
-    // In production: This would be Stripe/PayPal checkout URL
-    const checkoutUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout/payment?session=${paymentSessionId}&order=${order.id}`;
+      const eventName = `${event.homeTeam} vs ${event.awayTeam} - ${event.stadium.name}`;
+
+      try {
+        const stripeSession = await this.stripe.createCheckoutSession({
+          orderId: order.id,
+          amount: Math.round(totalAmount * 100), // Convert ILS to agorot
+          currency: 'ILS',
+          customerEmail: email,
+          eventName,
+          seatDetails: `Seats: ${seatDetails}`,
+          successUrl: `${frontendUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
+          cancelUrl: `${frontendUrl}/checkout/cancel?order_id=${order.id}`,
+        });
+
+        checkoutUrl = stripeSession.url;
+        paymentSessionId = stripeSession.id;
+
+        // Store session mapping in Redis (30 minutes)
+        await this.redis.set(
+          `payment:session:${stripeSession.id}`,
+          {
+            orderId: order.id,
+            sessionId,
+            eventId,
+            userId,
+            totalAmount: totalAmount.toString(),
+          },
+          1800, // 30 minutes
+        );
+      } catch (error) {
+        throw new BadRequestException(`Failed to create Stripe session: ${error.message}`);
+      }
+    } else {
+      // Fallback to simulation mode
+      paymentSessionId = `sim_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      // Store payment session info in Redis (5 minutes)
+      await this.redis.set(
+        `payment:session:${paymentSessionId}`,
+        {
+          orderId: order.id,
+          sessionId,
+          eventId,
+          userId,
+          totalAmount: totalAmount.toString(),
+        },
+        300, // 5 minutes
+      );
+
+      // Mock checkout URL for testing
+      checkoutUrl = `${frontendUrl}/checkout/payment?session=${paymentSessionId}&order=${order.id}`;
+    }
 
     return {
       success: true,

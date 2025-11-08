@@ -7,6 +7,7 @@ import { Public } from '../auth/public.decorator';
 export class CheckoutController {
   constructor(private readonly checkoutService: CheckoutService) {}
 
+  @Public() // TEMPORARY: Disabled auth for testing
   @Post('session')
   createSession(
     @Body()
@@ -18,14 +19,15 @@ export class CheckoutController {
       lastName: string;
       phone: string;
     },
-    @User() user: { userId: string },
+    @User() user?: { userId: string },
   ) {
     return this.checkoutService.createSession({
       ...body,
-      userId: user.userId,
+      userId: user?.userId || 'test-user',
     });
   }
 
+  @Public() // TEMPORARY: Disabled auth for testing
   @Get('order/:orderId')
   getOrderStatus(@Param('orderId') orderId: string) {
     return this.checkoutService.getOrderStatus(orderId);

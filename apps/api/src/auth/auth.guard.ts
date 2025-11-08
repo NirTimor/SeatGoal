@@ -5,16 +5,24 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { createClerkClient } from '@clerk/backend';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private clerkClient;
+
   constructor(
-    private jwtService: JwtService,
     private reflector: Reflector,
-  ) {}
+    private config: ConfigService,
+  ) {
+    const secretKey = this.config.get<string>('CLERK_SECRET_KEY');
+    if (secretKey) {
+      this.clerkClient = createClerkClient({ secretKey });
+    }
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if route is marked as public
@@ -34,14 +42,19 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('No authorization token provided');
     }
 
+    if (!this.clerkClient) {
+      throw new UnauthorizedException('Authentication not configured');
+    }
+
     try {
-      const payload = await this.jwtService.verifyAsync(token);
+      // Verify the Clerk JWT token
+      const payload = await this.clerkClient.verifyToken(token);
 
       // Attach user info to request
       request.user = {
         userId: payload.sub,
         email: payload.email,
-        phone: payload.phone,
+        phone: payload.phone_number,
       };
 
       return true;

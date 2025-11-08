@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { StripeModule } from './stripe/stripe.module';
 import { AuthModule } from './auth/auth.module';
 import { EventsModule } from './events/events.module';
 import { SeatsModule } from './seats/seats.module';
@@ -24,6 +25,7 @@ import { OrdersModule } from './orders/orders.module';
     }),
     PrismaModule,
     RedisModule,
+    StripeModule,
     AuthModule,
     EventsModule,
     SeatsModule,
