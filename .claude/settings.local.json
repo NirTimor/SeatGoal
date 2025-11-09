@@ -34,7 +34,15 @@
       "mcp__chrome-devtools__take_screenshot",
       "mcp__chrome-devtools__list_console_messages",
       "mcp__chrome-devtools__take_snapshot",
-      "mcp__chrome-devtools__click"
+      "mcp__chrome-devtools__click",
+      "Bash(pnpm logs:*)",
+      "Bash(curl:*)",
+      "Bash(npx prisma db execute:*)",
+      "Bash(timeout 2 echo:*)",
+      "Bash(nul)",
+      "Bash(test:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
