@@ -42,7 +42,9 @@
       "Bash(nul)",
       "Bash(test:*)",
       "Bash(npx prisma migrate:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File test-api-flow.ps1)",
+      "Bash(python -c:*)"
     ],
     "deny": [],
     "ask": []
