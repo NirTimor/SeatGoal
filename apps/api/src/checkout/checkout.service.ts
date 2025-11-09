@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { StripeService } from '../stripe/stripe.service';
+import { EventsService } from '../events/events.service';
 
 interface CreateCheckoutSessionDto {
   eventId: string;
@@ -25,6 +26,7 @@ export class CheckoutService {
     private redis: RedisService,
     private stripe: StripeService,
     private config: ConfigService,
+    private eventsService: EventsService,
   ) {}
 
   async createSession(dto: CreateCheckoutSessionDto) {
@@ -314,6 +316,9 @@ export class CheckoutService {
         },
       });
 
+      // Invalidate seats cache since status changed to SOLD
+      await this.eventsService.invalidateSeatsCache(eventId);
+
       // Release Redis holds
       const heldSeats = await this.redis.getHeldSeats(eventId, sessionId);
       if (heldSeats.length > 0) {
@@ -358,6 +363,9 @@ export class CheckoutService {
             holdExpiresAt: null,
           },
         });
+
+        // Invalidate seats cache since status changed back to AVAILABLE
+        await this.eventsService.invalidateSeatsCache(eventId);
       }
 
       // Release Redis holds
