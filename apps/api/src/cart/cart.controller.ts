@@ -1,7 +1,6 @@
 import { Controller, Post, Delete, Patch, Body, Param } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { User } from '../auth/user.decorator';
-import { Public } from '../auth/public.decorator';
 
 @Controller('cart')
 export class CartController {
