@@ -4,21 +4,19 @@ import { notFound } from 'next/navigation';
 import EventDetails from '@/components/EventDetails';
 
 export default async function EventPage({
-  params: { locale, id },
+  params,
 }: {
-  params: { locale: string; id: string };
+  params: Promise<{ locale: string; id: string }>;
 }) {
+  const { locale, id } = await params;
   unstable_setRequestLocale(locale);
 
   try {
-    const [{ data: event }, { data: seatsData }] = await Promise.all([
-      api.getEvent(id),
-      api.getEventSeats(id),
-    ]);
+    // Only fetch event data server-side
+    // Seats data is now fetched client-side with React Query for better caching
+    const { data: event } = await api.getEvent(id);
 
-    return (
-      <EventDetails event={event} seatsData={seatsData} locale={locale} />
-    );
+    return <EventDetails event={event} locale={locale} />;
   } catch (error) {
     console.error('Error loading event:', error);
     notFound();

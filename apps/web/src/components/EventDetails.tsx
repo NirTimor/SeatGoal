@@ -1,29 +1,111 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Event, EventSeats, Seat } from '@/lib/api';
-import { api } from '@/lib/api';
+import type { Event, Seat } from '@/lib/api';
 import { useAuth } from '@clerk/nextjs';
+import {
+  useEventSeats,
+  useHoldSeats,
+  useReleaseSeats,
+} from '@/hooks/useSeats';
+import SeatMapSkeleton from './SeatMapSkeleton';
 
 interface EventDetailsProps {
   event: Event;
-  seatsData: EventSeats;
   locale: string;
 }
 
-export default function EventDetails({
-  event,
-  seatsData,
-  locale,
-}: EventDetailsProps) {
-  const { getToken, isSignedIn } = useAuth();
+export default function EventDetails({ event, locale }: EventDetailsProps) {
+  const { isSignedIn } = useAuth();
   const isHebrew = locale === 'he';
 
+  // Use React Query hook for seats with automatic caching and refetching
+  const {
+    data: seatsData,
+    isLoading: isLoadingSeats,
+    error: seatsError,
+  } = useEventSeats(event.id);
+
+  // Mutations for hold/release with optimistic updates
+  const holdMutation = useHoldSeats(event.id);
+  const releaseMutation = useReleaseSeats(event.id);
+
+  // All state hooks must be at the top before any conditional returns
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [holdExpiry, setHoldExpiry] = useState<Date | null>(null);
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random()}`);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (!holdExpiry) {
+      setTimeRemaining(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = holdExpiry.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeRemaining(0);
+        setHoldExpiry(null);
+        setSelectedSeats([]);
+      } else {
+        setTimeRemaining(Math.floor(diff / 1000));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [holdExpiry]);
+
+  // Show skeleton while loading
+  if (isLoadingSeats) {
+    return <SeatMapSkeleton locale={locale} />;
+  }
+
+  // Show error state
+  if (seatsError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md">
+          <div className="text-red-600 text-center">
+            <svg
+              className="w-16 h-16 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <h2 className="text-xl font-bold mb-2">
+              {isHebrew ? 'שגיאה בטעינת המושבים' : 'Error Loading Seats'}
+            </h2>
+            <p className="text-gray-600">
+              {seatsError instanceof Error
+                ? seatsError.message
+                : isHebrew
+                  ? 'לא ניתן לטעון את המושבים כרגע'
+                  : 'Unable to load seats at this time'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
+            >
+              {isHebrew ? 'נסה שוב' : 'Try Again'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!seatsData) return null;
 
   // Group seats by section
   const seatsBySection = seatsData.seats.reduce(
@@ -70,69 +152,34 @@ export default function EventDetails({
       return;
     }
 
-    setLoading(true);
     setError(null);
 
     try {
-      const token = await getToken();
-      const result = await api.holdSeats(
-        event.id,
-        selectedSeats.map((s) => s.seatId),
+      const result = await holdMutation.mutateAsync({
+        seatIds: selectedSeats.map((s) => s.seatId),
         sessionId,
-        token || undefined,
-      );
+      });
 
-      if (result.data.success) {
-        setHoldExpiry(new Date(result.data.expiresAt));
-        setError(null);
+      if (result.success) {
+        setHoldExpiry(new Date(result.expiresAt));
       }
     } catch (err: any) {
       setError(err.message || 'Failed to hold seats');
       setSelectedSeats([]);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleReleaseSeats = async () => {
     if (!isSignedIn) return;
 
-    setLoading(true);
     try {
-      const token = await getToken();
-      await api.releaseHold(event.id, sessionId, token || undefined);
+      await releaseMutation.mutateAsync({ sessionId });
       setSelectedSeats([]);
       setHoldExpiry(null);
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
-
-  // Timer countdown
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
-
-  useEffect(() => {
-    if (!holdExpiry) {
-      setTimeRemaining(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const now = new Date();
-      const diff = holdExpiry.getTime() - now.getTime();
-      if (diff <= 0) {
-        setTimeRemaining(0);
-        setHoldExpiry(null);
-        setSelectedSeats([]);
-      } else {
-        setTimeRemaining(Math.floor(diff / 1000));
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [holdExpiry]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -144,6 +191,8 @@ export default function EventDetails({
     (sum, seat) => sum + parseFloat(seat.price),
     0,
   );
+
+  const isLoading = holdMutation.isPending || releaseMutation.isPending;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -324,10 +373,16 @@ export default function EventDetails({
 
                       <button
                         onClick={handleReleaseSeats}
-                        disabled={loading}
+                        disabled={isLoading}
                         className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded transition-colors duration-200 disabled:opacity-50"
                       >
-                        {isHebrew ? 'שחרר מושבים' : 'Release Seats'}
+                        {isLoading && releaseMutation.isPending
+                          ? isHebrew
+                            ? 'משחרר...'
+                            : 'Releasing...'
+                          : isHebrew
+                            ? 'שחרר מושבים'
+                            : 'Release Seats'}
                       </button>
 
                       <a
@@ -340,16 +395,38 @@ export default function EventDetails({
                   ) : (
                     <button
                       onClick={handleHoldSeats}
-                      disabled={loading || selectedSeats.length === 0}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded transition-colors duration-200 disabled:opacity-50"
+                      disabled={isLoading || selectedSeats.length === 0}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                     >
-                      {loading
-                        ? isHebrew
-                          ? 'מחזיק...'
-                          : 'Holding...'
-                        : isHebrew
-                          ? 'החזק מושבים'
-                          : 'Hold Seats'}
+                      {isLoading && holdMutation.isPending ? (
+                        <>
+                          <svg
+                            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          {isHebrew ? 'מחזיק...' : 'Holding...'}
+                        </>
+                      ) : isHebrew ? (
+                        'החזק מושבים'
+                      ) : (
+                        'Hold Seats'
+                      )}
                     </button>
                   )}
                 </>

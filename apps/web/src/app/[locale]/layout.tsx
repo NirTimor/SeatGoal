@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { setRequestLocale } from 'next-intl/server';
 import { ClerkProvider } from '@clerk/nextjs';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -30,9 +31,11 @@ export default async function LocaleLayout({
     <ClerkProvider>
       <html lang={locale} dir={dir}>
         <body>
-          <NextIntlClientProvider messages={messages}>
-            {children}
-          </NextIntlClientProvider>
+          <QueryProvider>
+            <NextIntlClientProvider messages={messages}>
+              {children}
+            </NextIntlClientProvider>
+          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>
