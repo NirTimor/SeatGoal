@@ -76,6 +76,7 @@ model Event {
   @@index([stadiumId])
   @@index([eventDate])
   @@index([status])
+  @@index([status, eventDate]) // Composite index for filtering by status and ordering by date
   @@map("events")
 }
 

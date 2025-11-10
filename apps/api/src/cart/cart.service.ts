@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { EventsService } from '../events/events.service';
 
 interface HoldSeatsDto {
   eventId: string;
@@ -21,6 +22,7 @@ export class CartService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
+    private eventsService: EventsService,
   ) {}
 
   async holdSeats(dto: HoldSeatsDto) {
@@ -104,6 +106,9 @@ export class CartService {
       },
     });
 
+    // Invalidate seats cache since status changed
+    await this.eventsService.invalidateSeatsCache(eventId);
+
     // Calculate total price
     const totalPrice = inventory.reduce(
       (sum, item) => sum + Number(item.price),
@@ -155,6 +160,9 @@ export class CartService {
       },
     });
 
+    // Invalidate seats cache since status changed
+    await this.eventsService.invalidateSeatsCache(eventId);
+
     return {
       success: true,
       releasedSeats: seatIds.length,
@@ -202,6 +210,9 @@ export class CartService {
         holdExpiresAt: newExpiresAt,
       },
     });
+
+    // Invalidate seats cache to ensure fresh expiry times
+    await this.eventsService.invalidateSeatsCache(eventId);
 
     return {
       success: true,
