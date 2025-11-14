@@ -12,15 +12,16 @@ datasource db {
 
 // Stadium model
 model Stadium {
-  id        String   @id @default(uuid())
-  name      String
-  nameHe    String   @map("name_he")
-  city      String
-  cityHe    String   @map("city_he")
-  capacity  Int
-  svgMap    String?  @map("svg_map") @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  name          String
+  nameHe        String   @map("name_he")
+  city          String
+  cityHe        String   @map("city_he")
+  capacity      Int
+  svgMap        String?  @map("svg_map") @db.Text
+  seatViewImages Json?   @map("seat_view_images") // Map of section IDs to image URLs
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
   seats  Seat[]
@@ -31,15 +32,19 @@ model Stadium {
 
 // Seat model - represents physical seats in a stadium
 model Seat {
-  id        String   @id @default(uuid())
-  stadiumId String   @map("stadium_id")
-  section   String
-  row       String
-  number    String
-  x         Float?   // SVG coordinates
-  y         Float?   // SVG coordinates
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String     @id @default(uuid())
+  stadiumId     String     @map("stadium_id")
+  section       String
+  row           String
+  number        String
+  x             Float?     // SVG coordinates
+  y             Float?     // SVG coordinates
+  priceZone     PriceZone  @default(STANDARD) @map("price_zone")
+  isAccessible  Boolean    @default(false) @map("is_accessible")
+  amenities     Json?      // Nearby facilities info (bathrooms, food, etc.)
+  viewRating    Int?       @map("view_rating") // 1-5 quality rating
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
 
   // Relations
   stadium   Stadium           @relation(fields: [stadiumId], references: [id], onDelete: Cascade)
@@ -47,7 +52,16 @@ model Seat {
 
   @@unique([stadiumId, section, row, number])
   @@index([stadiumId])
+  @@index([priceZone])
+  @@index([isAccessible])
   @@map("seats")
+}
+
+enum PriceZone {
+  VIP
+  PREMIUM
+  STANDARD
+  ECONOMY
 }
 
 // Event model

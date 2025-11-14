@@ -157,6 +157,10 @@ export class EventsService {
       y: item.seat.y,
       price: item.price.toString(),
       status: item.status,
+      priceZone: item.seat.priceZone,
+      isAccessible: item.seat.isAccessible,
+      amenities: item.seat.amenities,
+      viewRating: item.seat.viewRating,
     }));
 
     const result = {

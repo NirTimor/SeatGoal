@@ -23,6 +23,7 @@ export interface Event {
     city: string;
     cityHe: string;
     capacity: number;
+    seatViewImages?: Record<string, string> | null;
   };
 }
 
@@ -36,6 +37,10 @@ export interface Seat {
   y?: number;
   price: string;
   status: 'AVAILABLE' | 'HELD' | 'SOLD' | 'UNAVAILABLE';
+  priceZone: 'VIP' | 'PREMIUM' | 'STANDARD' | 'ECONOMY';
+  isAccessible: boolean;
+  amenities?: Record<string, any> | null;
+  viewRating?: number | null;
 }
 
 export interface EventSeats {

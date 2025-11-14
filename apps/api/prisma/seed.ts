@@ -1,4 +1,4 @@
-import { PrismaClient, EventStatus, SeatStatus } from '@prisma/client';
+import { PrismaClient, EventStatus, SeatStatus, PriceZone } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -25,6 +25,13 @@ async function main() {
       cityHe: 'תל אביב',
       capacity: 29400,
       svgMap: null, // SVG map can be added later
+      seatViewImages: {
+        'Gate 2': 'https://placehold.co/800x600/0066cc/ffffff?text=West+VIP+View',
+        'Gate 6': 'https://placehold.co/800x600/0066cc/ffffff?text=East+Lower+View',
+        'Gate 7': 'https://placehold.co/800x600/0066cc/ffffff?text=East+Lower+View',
+        'Gate 4': 'https://placehold.co/800x600/0066cc/ffffff?text=North+Stand+View',
+        'Gate 10': 'https://placehold.co/800x600/0066cc/ffffff?text=South+Stand+View',
+      },
     },
   });
 
@@ -36,6 +43,12 @@ async function main() {
       cityHe: 'ירושלים',
       capacity: 31733,
       svgMap: null,
+      seatViewImages: {
+        'North': 'https://placehold.co/800x600/ffcc00/000000?text=Teddy+North+View',
+        'South': 'https://placehold.co/800x600/ffcc00/000000?text=Teddy+South+View',
+        'East': 'https://placehold.co/800x600/ffcc00/000000?text=Teddy+East+View',
+        'West': 'https://placehold.co/800x600/ffcc00/000000?text=Teddy+West+View',
+      },
     },
   });
 
@@ -47,30 +60,103 @@ async function main() {
       cityHe: 'חיפה',
       capacity: 30780,
       svgMap: null,
+      seatViewImages: {
+        'North': 'https://placehold.co/800x600/009933/ffffff?text=Sammy+North+View',
+        'South': 'https://placehold.co/800x600/009933/ffffff?text=Sammy+South+View',
+        'East': 'https://placehold.co/800x600/009933/ffffff?text=Sammy+East+View',
+        'West': 'https://placehold.co/800x600/009933/ffffff?text=Sammy+West+View',
+      },
     },
   });
 
   console.log('✅ Created 3 stadiums');
 
-  // Create Seats for Bloomfield Stadium (simplified - 4 sections)
+  // Create Seats for Bloomfield Stadium (realistic layout with 13 gates)
   console.log('💺 Creating seats for Bloomfield Stadium...');
 
-  const sections = ['A', 'B', 'C', 'D'];
-  const rows = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-  const seatsPerRow = 20;
+  // Bloomfield Stadium has 13 gates organized in 4 stands:
+  // West Stand: Gates 1, 2, 3, 12, 13
+  // North Stand: Gates 4, 5
+  // East Stand: Gates 6, 7, 8, 9 (two-tier)
+  // South Stand: Gates 10, 11
+
+  const bloomfieldGates = [
+    // West Stand (left side of field)
+    { gate: '1', stand: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 150, price: 100, priceZone: PriceZone.STANDARD, label: 'שער 1', viewRating: 4 },
+    { gate: '2', stand: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 250, price: 120, priceZone: PriceZone.PREMIUM, label: 'שער 2', viewRating: 5 }, // VIP/Silver section
+    { gate: '3', stand: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 350, price: 100, priceZone: PriceZone.STANDARD, label: 'שער 3', viewRating: 4 },
+    { gate: '12', stand: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 450, price: 90, priceZone: PriceZone.ECONOMY, label: 'שער 12', viewRating: 3 },
+    { gate: '13', stand: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 550, price: 90, priceZone: PriceZone.ECONOMY, label: 'שער 13', viewRating: 3 },
+
+    // North Stand (top - away fans)
+    { gate: '4', stand: 'North', rows: 12, seatsPerRow: 30, baseX: 200, baseY: 50, price: 80, priceZone: PriceZone.ECONOMY, label: 'שער 4', viewRating: 3 },
+    { gate: '5', stand: 'North', rows: 12, seatsPerRow: 30, baseX: 400, baseY: 50, price: 80, priceZone: PriceZone.ECONOMY, label: 'שער 5', viewRating: 3 },
+
+    // East Stand (right side - two-tier)
+    { gate: '6', stand: 'East Lower', rows: 20, seatsPerRow: 28, baseX: 750, baseY: 150, price: 110, priceZone: PriceZone.PREMIUM, label: 'שער 6', viewRating: 5 },
+    { gate: '7', stand: 'East Lower', rows: 20, seatsPerRow: 28, baseX: 750, baseY: 350, price: 110, priceZone: PriceZone.PREMIUM, label: 'שער 7', viewRating: 5 },
+    { gate: '8', stand: 'East Upper', rows: 15, seatsPerRow: 25, baseX: 800, baseY: 200, price: 90, priceZone: PriceZone.STANDARD, label: 'שער 8', viewRating: 4 },
+    { gate: '9', stand: 'East Upper', rows: 15, seatsPerRow: 25, baseX: 800, baseY: 400, price: 90, priceZone: PriceZone.STANDARD, label: 'שער 9', viewRating: 4 },
+
+    // South Stand (bottom)
+    { gate: '10', stand: 'South', rows: 12, seatsPerRow: 30, baseX: 200, baseY: 700, price: 85, priceZone: PriceZone.ECONOMY, label: 'שער 10', viewRating: 3 },
+    { gate: '11', stand: 'South', rows: 12, seatsPerRow: 30, baseX: 400, baseY: 700, price: 85, priceZone: PriceZone.ECONOMY, label: 'שער 11', viewRating: 3 },
+  ];
 
   const bloomfieldSeats = [];
 
-  for (const section of sections) {
-    for (const row of rows) {
-      for (let seatNum = 1; seatNum <= seatsPerRow; seatNum++) {
+  for (const gateConfig of bloomfieldGates) {
+    for (let rowNum = 1; rowNum <= gateConfig.rows; rowNum++) {
+      for (let seatNum = 1; seatNum <= gateConfig.seatsPerRow; seatNum++) {
+        // Calculate SVG coordinates for visual positioning
+        // Arrange seats in a curved/angled pattern around the field
+        let x = gateConfig.baseX;
+        let y = gateConfig.baseY;
+
+        // Offset based on row (depth from field)
+        const rowOffset = (rowNum - 1) * 3;
+
+        // Offset based on seat number (horizontal spread)
+        const seatOffset = (seatNum - 1) * 3;
+
+        // Apply offsets based on stand position
+        if (gateConfig.stand.includes('West')) {
+          x += rowOffset; // Move away from field
+          y += seatOffset; // Spread vertically
+        } else if (gateConfig.stand.includes('East')) {
+          x -= rowOffset; // Move away from field (opposite direction)
+          y += seatOffset; // Spread vertically
+        } else if (gateConfig.stand.includes('North')) {
+          x += seatOffset; // Spread horizontally
+          y += rowOffset; // Move away from field
+        } else if (gateConfig.stand.includes('South')) {
+          x += seatOffset; // Spread horizontally
+          y -= rowOffset; // Move away from field (opposite direction)
+        }
+
+        // Determine if seat is accessible (first row and aisle seats)
+        const isAisleSeat = seatNum === 1 || seatNum === gateConfig.seatsPerRow;
+        const isAccessible = rowNum === 1 && isAisleSeat;
+
+        // Add amenities for accessible seats and specific sections
+        const amenities = isAccessible ? {
+          wheelchair: true,
+          elevator: gateConfig.gate === '2' || gateConfig.gate === '6',
+          bathroom: ['2', '6', '10'].includes(gateConfig.gate),
+          food: ['2', '6', '7'].includes(gateConfig.gate),
+        } : null;
+
         bloomfieldSeats.push({
           stadiumId: bloomfieldStadium.id,
-          section,
-          row,
+          section: `Gate ${gateConfig.gate}`,
+          row: rowNum.toString(),
           number: seatNum.toString(),
-          x: null, // SVG coordinates can be added later
-          y: null,
+          x: x,
+          y: y,
+          priceZone: gateConfig.priceZone,
+          isAccessible: isAccessible,
+          amenities: amenities,
+          viewRating: gateConfig.viewRating,
         });
       }
     }
@@ -80,24 +166,71 @@ async function main() {
     data: bloomfieldSeats,
   });
 
-  console.log(`✅ Created ${bloomfieldSeats.length} seats for Bloomfield Stadium`);
+  console.log(`✅ Created ${bloomfieldSeats.length} seats for Bloomfield Stadium (${bloomfieldGates.length} gates)`);
 
-  // Create Seats for Teddy Stadium (simplified - 3 sections)
+  // Create Seats for Teddy Stadium with realistic layout
   console.log('💺 Creating seats for Teddy Stadium...');
 
-  const teddySections = ['North', 'South', 'East'];
+  // Teddy Stadium has 4 main stands with different characteristics
+  const teddyStands = [
+    // North Stand - Premium with VIP boxes
+    { section: 'North', rows: 18, seatsPerRow: 30, baseX: 200, baseY: 50, priceZone: PriceZone.PREMIUM, viewRating: 5 },
+    // South Stand - Standard
+    { section: 'South', rows: 20, seatsPerRow: 32, baseX: 200, baseY: 700, priceZone: PriceZone.STANDARD, viewRating: 4 },
+    // East Stand - Economy (family section)
+    { section: 'East', rows: 25, seatsPerRow: 28, baseX: 750, baseY: 200, priceZone: PriceZone.ECONOMY, viewRating: 3 },
+    // West Stand - VIP (covered seating)
+    { section: 'West', rows: 15, seatsPerRow: 25, baseX: 50, baseY: 250, priceZone: PriceZone.VIP, viewRating: 5 },
+  ];
+
   const teddySeats = [];
 
-  for (const section of teddySections) {
-    for (const row of rows) {
-      for (let seatNum = 1; seatNum <= seatsPerRow; seatNum++) {
+  for (const stand of teddyStands) {
+    for (let rowNum = 1; rowNum <= stand.rows; rowNum++) {
+      for (let seatNum = 1; seatNum <= stand.seatsPerRow; seatNum++) {
+        // Calculate SVG coordinates
+        let x = stand.baseX;
+        let y = stand.baseY;
+
+        const rowOffset = (rowNum - 1) * 3;
+        const seatOffset = (seatNum - 1) * 3;
+
+        if (stand.section === 'West') {
+          x += rowOffset;
+          y += seatOffset;
+        } else if (stand.section === 'East') {
+          x -= rowOffset;
+          y += seatOffset;
+        } else if (stand.section === 'North') {
+          x += seatOffset;
+          y += rowOffset;
+        } else if (stand.section === 'South') {
+          x += seatOffset;
+          y -= rowOffset;
+        }
+
+        // Determine accessibility (first and last row, aisle seats)
+        const isAisleSeat = seatNum === 1 || seatNum === stand.seatsPerRow;
+        const isAccessible = (rowNum === 1 || rowNum === stand.rows) && isAisleSeat;
+
+        const amenities = isAccessible ? {
+          wheelchair: true,
+          elevator: stand.section === 'North' || stand.section === 'West',
+          bathroom: true,
+          food: stand.section === 'North' || stand.section === 'West',
+        } : null;
+
         teddySeats.push({
           stadiumId: teddyStadium.id,
-          section,
-          row,
+          section: stand.section,
+          row: rowNum.toString(),
           number: seatNum.toString(),
-          x: null,
-          y: null,
+          x: x,
+          y: y,
+          priceZone: stand.priceZone,
+          isAccessible: isAccessible,
+          amenities: amenities,
+          viewRating: stand.viewRating,
         });
       }
     }
@@ -108,6 +241,80 @@ async function main() {
   });
 
   console.log(`✅ Created ${teddySeats.length} seats for Teddy Stadium`);
+
+  // Create Seats for Sammy Ofer Stadium with realistic layout
+  console.log('💺 Creating seats for Sammy Ofer Stadium...');
+
+  // Sammy Ofer is a modern stadium with well-distributed sections
+  const sammyStands = [
+    // North Stand - Home fans premium
+    { section: 'North', rows: 22, seatsPerRow: 35, baseX: 150, baseY: 50, priceZone: PriceZone.PREMIUM, viewRating: 5 },
+    // South Stand - Away fans
+    { section: 'South', rows: 18, seatsPerRow: 30, baseX: 200, baseY: 700, priceZone: PriceZone.ECONOMY, viewRating: 3 },
+    // East Stand - VIP and corporate boxes
+    { section: 'East', rows: 20, seatsPerRow: 32, baseX: 750, baseY: 180, priceZone: PriceZone.VIP, viewRating: 5 },
+    // West Stand - Standard seating
+    { section: 'West', rows: 24, seatsPerRow: 30, baseX: 50, baseY: 200, priceZone: PriceZone.STANDARD, viewRating: 4 },
+  ];
+
+  const sammySeats = [];
+
+  for (const stand of sammyStands) {
+    for (let rowNum = 1; rowNum <= stand.rows; rowNum++) {
+      for (let seatNum = 1; seatNum <= stand.seatsPerRow; seatNum++) {
+        // Calculate SVG coordinates
+        let x = stand.baseX;
+        let y = stand.baseY;
+
+        const rowOffset = (rowNum - 1) * 3;
+        const seatOffset = (seatNum - 1) * 3;
+
+        if (stand.section === 'West') {
+          x += rowOffset;
+          y += seatOffset;
+        } else if (stand.section === 'East') {
+          x -= rowOffset;
+          y += seatOffset;
+        } else if (stand.section === 'North') {
+          x += seatOffset;
+          y += rowOffset;
+        } else if (stand.section === 'South') {
+          x += seatOffset;
+          y -= rowOffset;
+        }
+
+        // Determine accessibility
+        const isAisleSeat = seatNum === 1 || seatNum === stand.seatsPerRow;
+        const isAccessible = rowNum === 1 && isAisleSeat;
+
+        const amenities = isAccessible ? {
+          wheelchair: true,
+          elevator: stand.section === 'North' || stand.section === 'East',
+          bathroom: true,
+          food: stand.section === 'North' || stand.section === 'East',
+        } : null;
+
+        sammySeats.push({
+          stadiumId: sammy.id,
+          section: stand.section,
+          row: rowNum.toString(),
+          number: seatNum.toString(),
+          x: x,
+          y: y,
+          priceZone: stand.priceZone,
+          isAccessible: isAccessible,
+          amenities: amenities,
+          viewRating: stand.viewRating,
+        });
+      }
+    }
+  }
+
+  await prisma.seat.createMany({
+    data: sammySeats,
+  });
+
+  console.log(`✅ Created ${sammySeats.length} seats for Sammy Ofer Stadium`);
 
   // Create Events
   console.log('⚽ Creating events...');
@@ -178,15 +385,27 @@ async function main() {
   });
 
   const ticketInventory1 = allBloomfieldSeats.map((seat) => {
-    // Vary prices by section
-    let price = 80; // Base price in ILS
-    if (seat.section === 'A') price = 120; // VIP section
-    if (seat.section === 'D') price = 60; // Budget section
+    // Pricing by gate based on Bloomfield Stadium layout
+    const priceMap: Record<string, number> = {
+      'Gate 1': 100,
+      'Gate 2': 120,  // VIP/Silver section
+      'Gate 3': 100,
+      'Gate 4': 80,   // North Stand (away fans)
+      'Gate 5': 80,   // North Stand (away fans)
+      'Gate 6': 110,  // East Lower (premium)
+      'Gate 7': 110,  // East Lower (premium)
+      'Gate 8': 90,   // East Upper
+      'Gate 9': 90,   // East Upper
+      'Gate 10': 85,  // South Stand
+      'Gate 11': 85,  // South Stand
+      'Gate 12': 90,
+      'Gate 13': 90,
+    };
 
     return {
       eventId: event1.id,
       seatId: seat.id,
-      price,
+      price: priceMap[seat.section] || 100,
       status: SeatStatus.AVAILABLE,
       holdExpiresAt: null,
     };
@@ -198,20 +417,24 @@ async function main() {
 
   console.log(`✅ Created ${ticketInventory1.length} tickets for Event 1`);
 
-  // Create Ticket Inventory for Event 2
+  // Create Ticket Inventory for Event 2 (Teddy Stadium)
   const allTeddySeats = await prisma.seat.findMany({
     where: { stadiumId: teddyStadium.id },
   });
 
   const ticketInventory2 = allTeddySeats.map((seat) => {
-    let price = 90;
-    if (seat.section === 'North') price = 130;
-    if (seat.section === 'East') price = 70;
+    // Price based on price zone
+    const priceMap = {
+      VIP: 150,
+      PREMIUM: 120,
+      STANDARD: 90,
+      ECONOMY: 70,
+    };
 
     return {
       eventId: event2.id,
       seatId: seat.id,
-      price,
+      price: priceMap[seat.priceZone] || 90,
       status: SeatStatus.AVAILABLE,
       holdExpiresAt: null,
     };
@@ -222,6 +445,35 @@ async function main() {
   });
 
   console.log(`✅ Created ${ticketInventory2.length} tickets for Event 2`);
+
+  // Create Ticket Inventory for Event 3 (Sammy Ofer Stadium)
+  const allSammySeats = await prisma.seat.findMany({
+    where: { stadiumId: sammy.id },
+  });
+
+  const ticketInventory3 = allSammySeats.map((seat) => {
+    // Price based on price zone
+    const priceMap = {
+      VIP: 140,
+      PREMIUM: 115,
+      STANDARD: 85,
+      ECONOMY: 65,
+    };
+
+    return {
+      eventId: event3.id,
+      seatId: seat.id,
+      price: priceMap[seat.priceZone] || 85,
+      status: SeatStatus.AVAILABLE,
+      holdExpiresAt: null,
+    };
+  });
+
+  await prisma.ticketInventory.createMany({
+    data: ticketInventory3,
+  });
+
+  console.log(`✅ Created ${ticketInventory3.length} tickets for Event 3`);
 
   // Mark some seats as SOLD or HELD for testing
   console.log('🔒 Marking some seats as sold/held for testing...');

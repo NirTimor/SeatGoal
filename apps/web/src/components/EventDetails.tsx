@@ -9,6 +9,7 @@ import {
   useReleaseSeats,
 } from '@/hooks/useSeats';
 import SeatMapSkeleton from './SeatMapSkeleton';
+import StadiumSeatMap from './StadiumSeatMap';
 
 interface EventDetailsProps {
   event: Event;
@@ -107,17 +108,7 @@ export default function EventDetails({ event, locale }: EventDetailsProps) {
 
   if (!seatsData) return null;
 
-  // Group seats by section
-  const seatsBySection = seatsData.seats.reduce(
-    (acc, seat) => {
-      if (!acc[seat.section]) {
-        acc[seat.section] = [];
-      }
-      acc[seat.section].push(seat);
-      return acc;
-    },
-    {} as Record<string, Seat[]>,
-  );
+  const seats = seatsData.seats;
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status !== 'AVAILABLE') return;
@@ -238,89 +229,14 @@ export default function EventDetails({ event, locale }: EventDetailsProps) {
                 {isHebrew ? 'בחר מושבים' : 'Select Seats'}
               </h2>
 
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mb-6 text-sm">
-                <div className="flex items-center">
-                  <div className="w-6 h-6 bg-green-500 rounded mr-2"></div>
-                  <span>{isHebrew ? 'פנוי' : 'Available'}</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-6 h-6 bg-blue-500 rounded mr-2"></div>
-                  <span>{isHebrew ? 'נבחר' : 'Selected'}</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-6 h-6 bg-yellow-500 rounded mr-2"></div>
-                  <span>{isHebrew ? 'מוחזק' : 'Held'}</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-6 h-6 bg-gray-400 rounded mr-2"></div>
-                  <span>{isHebrew ? 'נמכר' : 'Sold'}</span>
-                </div>
-              </div>
-
-              {/* Seats Grid by Section */}
-              <div className="space-y-8">
-                {Object.entries(seatsBySection).map(([section, seats]) => (
-                  <div key={section}>
-                    <h3 className="text-xl font-semibold mb-3">
-                      {isHebrew ? 'אזור' : 'Section'} {section}
-                    </h3>
-
-                    {/* Group by row */}
-                    {Object.entries(
-                      seats.reduce(
-                        (acc, seat) => {
-                          if (!acc[seat.row]) acc[seat.row] = [];
-                          acc[seat.row].push(seat);
-                          return acc;
-                        },
-                        {} as Record<string, Seat[]>,
-                      ),
-                    ).map(([row, rowSeats]) => (
-                      <div key={row} className="mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-600 w-12">
-                            {isHebrew ? 'שורה' : 'Row'} {row}
-                          </span>
-                          <div className="flex flex-wrap gap-1">
-                            {rowSeats
-                              .sort(
-                                (a, b) =>
-                                  parseInt(a.number) - parseInt(b.number),
-                              )
-                              .map((seat) => {
-                                const isSelected = selectedSeats.some(
-                                  (s) => s.seatId === seat.seatId,
-                                );
-                                return (
-                                  <button
-                                    key={seat.seatId}
-                                    onClick={() => handleSeatClick(seat)}
-                                    disabled={
-                                      seat.status !== 'AVAILABLE' || !!holdExpiry
-                                    }
-                                    className={`w-10 h-10 text-xs font-semibold rounded transition-all ${
-                                      isSelected
-                                        ? 'bg-blue-500 text-white scale-110'
-                                        : seat.status === 'AVAILABLE'
-                                          ? 'bg-green-500 text-white hover:scale-110 hover:bg-green-600'
-                                          : seat.status === 'HELD'
-                                            ? 'bg-yellow-500 text-white cursor-not-allowed'
-                                            : 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                                    }`}
-                                    title={`${section}-${row}-${seat.number} (${seat.price} ILS)`}
-                                  >
-                                    {seat.number}
-                                  </button>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              {/* Stadium SVG Map */}
+              <StadiumSeatMap
+                seats={seats}
+                selectedSeats={selectedSeats}
+                onSeatClick={handleSeatClick}
+                locale={locale}
+                seatViewImages={event.stadium.seatViewImages as Record<string, string>}
+              />
             </div>
           </div>
 
