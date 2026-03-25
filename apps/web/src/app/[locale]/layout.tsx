@@ -26,9 +26,16 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const messages = await getMessages();
   const dir = locale === 'he' ? 'rtl' : 'ltr';
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!publishableKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Copy apps/web/.env.example to apps/web/.env.local and set your Clerk publishable key.'
+    );
+  }
 
   return (
-    <ClerkProvider>
+    <ClerkProvider publishableKey={publishableKey}>
       <html lang={locale} dir={dir}>
         <body>
           <QueryProvider>

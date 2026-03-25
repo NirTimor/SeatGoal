@@ -6,7 +6,7 @@ A modern ticket purchasing platform for football games in Israel.
 
 This is a monorepo managed with Turborepo and pnpm:
 
-- `apps/web` - Next.js 14 frontend with TailwindCSS and i18n (Hebrew/English with RTL support)
+- `apps/web` - Next.js 14 frontend with TailwindCSS and i18n (Hebrew/English with RTL support). To add a new stadium seatmap, see `apps/web/src/stadiums/STADIUM_GUIDE.md`.
 - `apps/api` - NestJS backend API
 - `packages/types` - Shared TypeScript types and Zod schemas
 
@@ -24,6 +24,12 @@ npm install -g pnpm
 # Install dependencies
 pnpm install
 ```
+
+## First-time setup
+
+1. **Database (local):** from the repo root, `docker compose up -d` (see `docker-compose.yml`).
+2. **Environment:** copy `apps/api/.env.example` → `apps/api/.env` and `apps/web/.env.example` → `apps/web/.env.local`, then fill in values (Clerk, Redis, Stripe, etc.—comments in those files list where to get each).
+3. **Prisma:** `pnpm --filter api exec prisma generate` then `pnpm --filter api exec prisma migrate deploy` (or `migrate dev` while developing).
 
 ## Running the Project
 
