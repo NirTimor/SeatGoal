@@ -26,7 +26,11 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const messages = await getMessages();
   const dir = locale === 'he' ? 'rtl' : 'ltr';
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  // Real key in dev/prod via .env / hosting env. GitHub Actions has no .env.local; Clerk accepts
+  // this well-formed test placeholder for static generation (see clerk key validation / isPublishableKey).
+  const publishableKey =
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ||
+    (process.env.GITHUB_ACTIONS === 'true' ? 'pk_test_JA==' : '');
 
   if (!publishableKey) {
     throw new Error(

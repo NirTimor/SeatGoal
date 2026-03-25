@@ -44,6 +44,9 @@ jobs:
         run: pnpm lint
 
       - name: Build
+        env:
+          # Optional: override the GitHub Actions placeholder in layout.tsx with your real Clerk test key
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
         run: pnpm build
 
       - name: Test
