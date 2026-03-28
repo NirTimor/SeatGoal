@@ -42,12 +42,16 @@ export const HATIKVA_FIELD_X = HATIKVA_FIELD_X0 + (HATIKVA_FIELD_W_FULL - HATIKV
 export const HATIKVA_FIELD_Y = 2051;
 export const HATIKVA_FIELD_H = 1750;
 
-const WEST_STAND_Y_TOP = 1272;
-const WEST_STAND_Y_BOTTOM = 2051;
+/** Margin between stand shapes and green pitch (roughly inside chalk before corner arc). */
+export const HATIKVA_GRASS_STAND_GAP = 16;
 
-/** Map legacy Vivenu x (full west span 954–7272) onto current pitch span. */
+const WEST_STAND_Y_TOP = 1272;
+
+/** Map legacy Vivenu x onto stand span inset inside field left/right by `HATIKVA_GRASS_STAND_GAP`. */
 export function hatikvaWestX(oldX: number): number {
-  return HATIKVA_FIELD_X + (oldX - HATIKVA_FIELD_X0) * (HATIKVA_FIELD_W / HATIKVA_FIELD_W_FULL);
+  const g = HATIKVA_GRASS_STAND_GAP;
+  const wIn = HATIKVA_FIELD_W - 2 * g;
+  return HATIKVA_FIELD_X + g + (oldX - HATIKVA_FIELD_X0) * (wIn / HATIKVA_FIELD_W_FULL);
 }
 
 const WEST_STAND_X_BANDS: readonly { xl: number; xr: number }[] = [
@@ -60,17 +64,18 @@ const WEST_STAND_X_BANDS: readonly { xl: number; xr: number }[] = [
 function hatikvaWestStandPath(band: { xl: number; xr: number }): string {
   const L = hatikvaWestX(band.xl);
   const R = hatikvaWestX(band.xr);
-  return `M ${L},${WEST_STAND_Y_TOP} L ${R},${WEST_STAND_Y_TOP} L ${R},${WEST_STAND_Y_BOTTOM} L ${L},${WEST_STAND_Y_BOTTOM} Z`;
+  const yBot = HATIKVA_FIELD_Y - HATIKVA_GRASS_STAND_GAP;
+  return `M ${L},${WEST_STAND_Y_TOP} L ${R},${WEST_STAND_Y_TOP} L ${R},${yBot} L ${L},${yBot} Z`;
 }
 
 const HATIKVA_SOUTH_STAND_WIDTH = 732; // original Vivenu width (8004 − 7272)
-const HATIKVA_SOUTH_STAND_GAP = 6;
 
 export function hatikvaSouthStandGeometry(): { d: string; centroidX: number; centroidY: number } {
-  const left = HATIKVA_FIELD_X + HATIKVA_FIELD_W + HATIKVA_SOUTH_STAND_GAP;
+  const g = HATIKVA_GRASS_STAND_GAP;
+  const left = HATIKVA_FIELD_X + HATIKVA_FIELD_W + g;
   const right = left + HATIKVA_SOUTH_STAND_WIDTH;
-  const yTop = WEST_STAND_Y_BOTTOM;
-  const yBot = 3952;
+  const yTop = HATIKVA_FIELD_Y + g;
+  const yBot = HATIKVA_FIELD_Y + HATIKVA_FIELD_H - g;
   return {
     d: `M ${left},${yTop} L ${right},${yTop} L ${right},${yBot} L ${left},${yBot} Z`,
     centroidX: Math.round((left + right) / 2),
@@ -2453,7 +2458,8 @@ const ALL_SEATS: RealSeat[] = [
 export function buildRealHatikvaData(): RealStadiumData {
   const totalSeats = ALL_SEATS.length || SECTION_PATHS.reduce((sum, s) => sum + s.seatCount, 0);
   const sg = hatikvaSouthStandGeometry();
-  const yMidWest = Math.round((WEST_STAND_Y_TOP + WEST_STAND_Y_BOTTOM) / 2);
+  const westStandBottomY = HATIKVA_FIELD_Y - HATIKVA_GRASS_STAND_GAP;
+  const yMidWest = Math.round((WEST_STAND_Y_TOP + westStandBottomY) / 2);
   const sections = SECTION_PATHS.map((s) => {
     if (s.idx >= 0 && s.idx <= 3) {
       const band = WEST_STAND_X_BANDS[s.idx]!;
