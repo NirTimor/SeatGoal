@@ -11,6 +11,7 @@ import {
   HATIKVA_FIELD_W,
   HATIKVA_FIELD_X,
   HATIKVA_FIELD_Y,
+  hatikvaSouthStandGeometry,
 } from '../data/stadiumData';
 import type { RealSection, RealSeat } from '../data/stadiumData';
 
@@ -167,6 +168,7 @@ function isSectionPathTarget(target: EventTarget | null): boolean {
 export default function HaTikvaMap() {
   const locale = useLocale();
   const data = useMemo(() => buildRealHatikvaData(), []);
+  const southStandGeom = useMemo(() => hatikvaSouthStandGeometry(), []);
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -750,6 +752,106 @@ export default function HaTikvaMap() {
                   />
                 );
               })}
+
+              {(() => {
+                const { vip } = southStandGeom;
+                const pad = 5;
+                const gridL = vip.left + pad;
+                const gridR = vip.aisleLeft - pad;
+                const gridT = vip.y0 + pad;
+                const gridB = vip.y1 - pad;
+                const cols = 9;
+                const rows = 19;
+                const cw = (gridR - gridL) / cols;
+                const ch = (gridB - gridT) / rows;
+                const blockInteraction = (e: React.SyntheticEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                };
+                const vipLabelPx = Math.max(20, (vip.y1 - vip.y0) * 0.11);
+                const seatNodes: React.ReactNode[] = [];
+                for (let r = 0; r < rows; r++) {
+                  for (let c = 0; c < cols; c++) {
+                    seatNodes.push(
+                      <rect
+                        key={`vip-s-${r}-${c}`}
+                        x={gridL + c * cw + cw * 0.26}
+                        y={gridT + r * ch + ch * 0.12}
+                        width={cw * 0.48}
+                        height={ch * 0.76}
+                        rx={0.8}
+                        fill="#8b909a"
+                        fillOpacity={0.5}
+                        style={{ pointerEvents: 'none' }}
+                      />,
+                    );
+                  }
+                }
+                return (
+                  <g id="hatikva-stand5-vip">
+                    <rect
+                      x={vip.left}
+                      y={vip.y0}
+                      width={vip.right - vip.left}
+                      height={vip.y1 - vip.y0}
+                      fill="#f4f6f8"
+                      stroke="#94a3b8"
+                      strokeWidth={1.2}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    {seatNodes}
+                    <rect
+                      x={vip.aisleLeft}
+                      y={vip.y0}
+                      width={vip.right - vip.aisleLeft}
+                      height={vip.y1 - vip.y0}
+                      fill="#b8bcc6"
+                      stroke="#8b92a1"
+                      strokeWidth={1}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <text
+                      x={(vip.left + vip.aisleLeft) / 2}
+                      y={vip.y0 + (vip.y1 - vip.y0) * 0.22}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="#475569"
+                      fontSize={vipLabelPx}
+                      fontWeight="800"
+                      fontFamily="system-ui,Segoe UI,sans-serif"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}
+                    >
+                      {isHe ? 'תא כבוד' : 'VIP box'}
+                    </text>
+                    <text
+                      x={(vip.left + vip.aisleLeft) / 2}
+                      y={vip.y0 + (vip.y1 - vip.y0) * 0.38}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="#64748b"
+                      fontSize={vipLabelPx * 0.55}
+                      fontWeight="700"
+                      fontFamily="system-ui,Segoe UI,sans-serif"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}
+                    >
+                      {isHe ? 'נעול' : 'Locked'}
+                    </text>
+                    <rect
+                      data-stand5-vip-locked
+                      x={vip.left}
+                      y={vip.y0}
+                      width={vip.right - vip.left}
+                      height={vip.y1 - vip.y0}
+                      fill="transparent"
+                      cursor="not-allowed"
+                      aria-label={isHe ? 'תא כבוד — לא ניתן לבחור מושבים' : 'VIP box — seats not selectable'}
+                      onClick={blockInteraction}
+                      onMouseDown={blockInteraction}
+                      onTouchStart={blockInteraction}
+                    />
+                  </g>
+                );
+              })()}
 
               {zoom >= 0.6 &&
                 data.sections.map((section) => {

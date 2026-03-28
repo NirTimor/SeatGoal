@@ -69,17 +69,37 @@ function hatikvaWestStandPath(band: { xl: number; xr: number }): string {
 }
 
 const HATIKVA_SOUTH_STAND_WIDTH = 732; // original Vivenu width (8004 − 7272)
+/** Bottom strip of stand 5 — decorative locked VIP (not sold on map). */
+export const HATIKVA_SOUTH_VIP_HEIGHT_FRAC = 0.32;
 
-export function hatikvaSouthStandGeometry(): { d: string; centroidX: number; centroidY: number } {
+export type HatikvaSouthStandVipBounds = {
+  left: number;
+  right: number;
+  y0: number;
+  y1: number;
+  aisleLeft: number;
+};
+
+export function hatikvaSouthStandGeometry(): {
+  d: string;
+  centroidX: number;
+  centroidY: number;
+  vip: HatikvaSouthStandVipBounds;
+} {
   const g = HATIKVA_GRASS_STAND_GAP;
   const left = HATIKVA_FIELD_X + HATIKVA_FIELD_W + g;
   const right = left + HATIKVA_SOUTH_STAND_WIDTH;
   const yTop = HATIKVA_FIELD_Y + g;
   const yBot = HATIKVA_FIELD_Y + HATIKVA_FIELD_H - g;
+  const h = yBot - yTop;
+  const yVipStart = yBot - h * HATIKVA_SOUTH_VIP_HEIGHT_FRAC;
+  const aisleW = (right - left) * 0.14;
+  const aisleLeft = right - aisleW;
   return {
-    d: `M ${left},${yTop} L ${right},${yTop} L ${right},${yBot} L ${left},${yBot} Z`,
+    d: `M ${left},${yTop} L ${right},${yTop} L ${right},${yVipStart} L ${left},${yVipStart} Z`,
     centroidX: Math.round((left + right) / 2),
-    centroidY: Math.round((yTop + yBot) / 2),
+    centroidY: Math.round((yTop + yVipStart) / 2),
+    vip: { left, right, y0: yVipStart, y1: yBot, aisleLeft },
   };
 }
 
