@@ -30,12 +30,62 @@ export interface RealStadiumData {
   totalSeats: number;
 }
 
+/** Unified page + map + SVG backdrop so pale sections (יציע 5) sit on a matching gray. */
+export const HATIKVA_CANVAS_BG = '#d8d8dd';
+
+/** Pitch quad (Vivenu): narrowed width, centered — must match `HaTikvaMap` pitch math. */
+export const HATIKVA_FIELD_X0 = 954;
+export const HATIKVA_FIELD_RIGHT = 7272;
+export const HATIKVA_FIELD_W_FULL = HATIKVA_FIELD_RIGHT - HATIKVA_FIELD_X0;
+export const HATIKVA_FIELD_W = (HATIKVA_FIELD_W_FULL * 2) / 3;
+export const HATIKVA_FIELD_X = HATIKVA_FIELD_X0 + (HATIKVA_FIELD_W_FULL - HATIKVA_FIELD_W) / 2;
+export const HATIKVA_FIELD_Y = 2051;
+export const HATIKVA_FIELD_H = 1750;
+
+const WEST_STAND_Y_TOP = 1272;
+const WEST_STAND_Y_BOTTOM = 2051;
+
+/** Map legacy Vivenu x (full west span 954–7272) onto current pitch span. */
+export function hatikvaWestX(oldX: number): number {
+  return HATIKVA_FIELD_X + (oldX - HATIKVA_FIELD_X0) * (HATIKVA_FIELD_W / HATIKVA_FIELD_W_FULL);
+}
+
+const WEST_STAND_X_BANDS: readonly { xl: number; xr: number }[] = [
+  { xl: 954, xr: 3787 },
+  { xl: 3792, xr: 4490.670850686181 },
+  { xl: 4490.670850686181, xr: 6576 },
+  { xl: 6576, xr: 7272 },
+];
+
+function hatikvaWestStandPath(band: { xl: number; xr: number }): string {
+  const L = hatikvaWestX(band.xl);
+  const R = hatikvaWestX(band.xr);
+  return `M ${L},${WEST_STAND_Y_TOP} L ${R},${WEST_STAND_Y_TOP} L ${R},${WEST_STAND_Y_BOTTOM} L ${L},${WEST_STAND_Y_BOTTOM} Z`;
+}
+
+const HATIKVA_SOUTH_STAND_WIDTH = 732; // original Vivenu width (8004 − 7272)
+const HATIKVA_SOUTH_STAND_GAP = 6;
+
+export function hatikvaSouthStandGeometry(): { d: string; centroidX: number; centroidY: number } {
+  const left = HATIKVA_FIELD_X + HATIKVA_FIELD_W + HATIKVA_SOUTH_STAND_GAP;
+  const right = left + HATIKVA_SOUTH_STAND_WIDTH;
+  const yTop = WEST_STAND_Y_BOTTOM;
+  const yBot = 3952;
+  return {
+    d: `M ${left},${yTop} L ${right},${yTop} L ${right},${yBot} L ${left},${yBot} Z`,
+    centroidX: Math.round((left + right) / 2),
+    centroidY: Math.round((yTop + yBot) / 2),
+  };
+}
+
+const _hatikvaSouth = hatikvaSouthStandGeometry();
+
 // Gate positions for labels
 export const GATE_POSITIONS = [
-  { gate: 2, x: 1600, y: 1200, label: 'שער 2' },
-  { gate: 3, x: 4100, y: 1200, label: 'שער 3' },
-  { gate: 4, x: 5800, y: 1200, label: 'שער 4' },
-  { gate: 5, x: 7638, y: 2100, label: 'שער 5' },
+  { gate: 2, x: Math.round(hatikvaWestX(1600)), y: 1200, label: 'שער 2' },
+  { gate: 3, x: Math.round(hatikvaWestX(4100)), y: 1200, label: 'שער 3' },
+  { gate: 4, x: Math.round(hatikvaWestX(5800)), y: 1200, label: 'שער 4' },
+  { gate: 5, x: _hatikvaSouth.centroidX, y: 2100, label: 'יציע 5' },
 ];
 
 // Section path data (5 sections)
@@ -75,7 +125,7 @@ const SECTION_PATHS: RealSection[] = [
   },
   {
     idx: 3,
-    name: "יציע 4 ב",
+    name: "יציע 4",
     stand: "west",
     fill: "#c45100",
     stroke: "rgba(208.75, 93.75, 12.75, 1)",
@@ -86,7 +136,7 @@ const SECTION_PATHS: RealSection[] = [
   },
   {
     idx: 4,
-    name: "שער 5",
+    name: "יציע 5",
     stand: "south",
     fill: "#C45100",
     stroke: "rgba(208.75, 93.75, 12.75, 1)",
@@ -2402,11 +2452,31 @@ const ALL_SEATS: RealSeat[] = [
 
 export function buildRealHatikvaData(): RealStadiumData {
   const totalSeats = ALL_SEATS.length || SECTION_PATHS.reduce((sum, s) => sum + s.seatCount, 0);
+  const sg = hatikvaSouthStandGeometry();
+  const yMidWest = Math.round((WEST_STAND_Y_TOP + WEST_STAND_Y_BOTTOM) / 2);
+  const sections = SECTION_PATHS.map((s) => {
+    if (s.idx >= 0 && s.idx <= 3) {
+      const band = WEST_STAND_X_BANDS[s.idx]!;
+      const L = hatikvaWestX(band.xl);
+      const R = hatikvaWestX(band.xr);
+      return {
+        ...s,
+        d: hatikvaWestStandPath(band),
+        centroidX: Math.round((L + R) / 2),
+        centroidY: yMidWest,
+      };
+    }
+    if (s.idx === 4) {
+      return { ...s, d: sg.d, centroidX: sg.centroidX, centroidY: sg.centroidY };
+    }
+    return s;
+  });
+  const seats = ALL_SEATS.map((seat) => ({ ...seat, cx: hatikvaWestX(seat.cx) }));
   return {
     viewBox: '700 1050 7500 3100',
     fieldCenter: { x: 4100, y: 3000 },
-    sections: SECTION_PATHS,
-    seats: ALL_SEATS,
+    sections,
+    seats,
     totalSeats,
   };
 }

@@ -3,20 +3,77 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { buildRealHatikvaData, GATE_POSITIONS } from '../data/stadiumData';
+import {
+  buildRealHatikvaData,
+  GATE_POSITIONS,
+  HATIKVA_CANVAS_BG,
+  HATIKVA_FIELD_H,
+  HATIKVA_FIELD_W,
+  HATIKVA_FIELD_X,
+  HATIKVA_FIELD_Y,
+} from '../data/stadiumData';
 import type { RealSection, RealSeat } from '../data/stadiumData';
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 8;
 const FOCUS_SCREEN_FR = 0.75;
 
-const FRIENDLY_FILL: Record<string, string> = {
-  '#c45100': '#c97d62',
-  '#666666': '#8b9099',
+/** Display palette aligned with [Leaan](https://www.leaan.co.il) hatikva seatmap (peach / greys / terracotta / orange / pale end stand). */
+const LEAAN_SECTION_FILL: Record<number, string> = {
+  0: '#e5b091',
+  1: '#999999',
+  2: '#cc8452',
+  3: '#c44d00',
+  4: '#eeeeee',
 };
 
-function friendlyFill(hex: string): string {
-  return FRIENDLY_FILL[hex.toLowerCase()] ?? hex;
+function leaanSectionFill(section: RealSection): string {
+  return LEAAN_SECTION_FILL[section.idx] ?? section.fill;
+}
+
+function leaanLabelStyle(section: RealSection): { fill: string; stroke: string; strokeW: number; strokeOp: number } {
+  if (section.idx === 3) {
+    return { fill: '#ffffff', stroke: 'rgba(0,0,0,0.25)', strokeW: 2, strokeOp: 0.4 };
+  }
+  if (section.idx === 4) {
+    return { fill: '#374151', stroke: '#ffffff', strokeW: 3, strokeOp: 0.9 };
+  }
+  return { fill: '#1a1a1a', stroke: '#ffffff', strokeW: 4, strokeOp: 0.55 };
+}
+
+function findSeatSection(seat: RealSeat, sections: RealSection[]): RealSection | undefined {
+  return sections.find(
+    (s) =>
+      seat.fill.replace(/#/g, '').toLowerCase() === s.fill.replace(/#/g, '').toLowerCase() &&
+      Math.abs(seat.cx - s.centroidX) < 2500 &&
+      Math.abs(seat.cy - s.centroidY) < 800,
+  );
+}
+
+function leaanSeatDisplayFill(seat: RealSeat, sections: RealSection[]): string {
+  const sec = findSeatSection(seat, sections);
+  if (sec) return leaanSectionFill(sec);
+  return '#c97d62';
+}
+
+/** “Block” number – first digit group in section name, else idx+1 (Leaan-style). */
+function hatikvaDisplayBlock(section: RealSection): string {
+  const m = section.name.match(/(\d+)/);
+  if (m) return m[1]!;
+  return String(section.idx + 1);
+}
+
+function hatikvaNearestGate(section: RealSection): number {
+  let bestGate = GATE_POSITIONS[0]!.gate;
+  let bestD = Infinity;
+  for (const g of GATE_POSITIONS) {
+    const d = (section.centroidX - g.x) ** 2 + (section.centroidY - g.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      bestGate = g.gate;
+    }
+  }
+  return bestGate;
 }
 
 function seatKey(s: Pick<RealSeat, 'cx' | 'cy'>): string {
@@ -106,11 +163,6 @@ function isSeatDotTarget(target: EventTarget | null): boolean {
 function isSectionPathTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest('[data-section-path]') !== null;
 }
-
-const fieldCx = 4113;
-const fieldCy = 2900;
-const fieldW = 5200;
-const fieldH = 1500;
 
 export default function HaTikvaMap() {
   const locale = useLocale();
@@ -211,49 +263,28 @@ export default function HaTikvaMap() {
   const handleSectionClick = useCallback((e: React.MouseEvent, section: RealSection) => {
     e.stopPropagation();
     const path = e.currentTarget as SVGPathElement;
-    const b = path.getBBox();
     setSelectedSeats([]);
     setSelectedSection(section.idx);
     setInfoPanelData(section);
 
     const runFit = () => {
       const container = containerRef.current;
-      const svg = svgRef.current;
-      if (!container || !svg) return;
+      if (!container) return;
       const cr = container.getBoundingClientRect();
-      const m = svg.getScreenCTM();
-      if (!m) return;
-
-      const toScr = (ux: number, uy: number) => {
-        const pt = svg.createSVGPoint();
-        pt.x = ux;
-        pt.y = uy;
-        return pt.matrixTransform(m);
-      };
-      const scr = [
-        toScr(b.x, b.y),
-        toScr(b.x + b.width, b.y),
-        toScr(b.x + b.width, b.y + b.height),
-        toScr(b.x, b.y + b.height),
-      ];
-      const wScr = Math.max(1, Math.max(...scr.map((p) => p.x)) - Math.min(...scr.map((p) => p.x)));
-      const hScr = Math.max(1, Math.max(...scr.map((p) => p.y)) - Math.min(...scr.map((p) => p.y)));
+      const pr = path.getBoundingClientRect();
+      const wScr = Math.max(1, pr.width);
+      const hScr = Math.max(1, pr.height);
 
       const zMul = Math.min((FOCUS_SCREEN_FR * cr.width) / wScr, (FOCUS_SCREEN_FR * cr.height) / hScr);
       setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * zMul)));
 
       const runCenter = () => {
-        const m2 = svg.getScreenCTM();
-        if (!m2) return;
-        const cx = b.x + b.width / 2;
-        const cy = b.y + b.height / 2;
-        const p = svg.createSVGPoint();
-        p.x = cx;
-        p.y = cy;
-        const sp = p.matrixTransform(m2);
+        const pr2 = path.getBoundingClientRect();
         const ccx = cr.left + cr.width / 2;
         const ccy = cr.top + cr.height / 2;
-        setPan((pp) => ({ x: pp.x + (ccx - sp.x), y: pp.y + (ccy - sp.y) }));
+        const rcx = pr2.left + pr2.width / 2;
+        const rcy = pr2.top + pr2.height / 2;
+        setPan((pp) => ({ x: pp.x + (ccx - rcx), y: pp.y + (ccy - rcy) }));
       };
 
       requestAnimationFrame(() => {
@@ -329,6 +360,16 @@ export default function HaTikvaMap() {
   }, [selectedSection, exitToOverview]);
 
   const [vbX, vbY, vbW, vbH] = data.viewBox.trim().split(/[\s,]+/).map(Number);
+  /** SVG user-units are ~7500 wide; fontSize must scale with vbW or labels look tiny on screen. */
+  const sectionMapFontSize = (seatCount: number) => {
+    const minFs = vbW * 0.019;
+    const maxFs = vbW * 0.033;
+    const t = (Math.sqrt(Math.max(seatCount, 64)) / 7.2) * (vbW * 0.00285);
+    return Math.max(minFs, Math.min(maxFs, t));
+  };
+  const gateBadgeFontSize = vbW * 0.0064;
+  const gateBadgePadX = vbW * 0.013;
+  const gateBadgePadY = vbH * 0.024;
 
   const isHe = locale === 'he' || locale.startsWith('he');
 
@@ -348,11 +389,67 @@ export default function HaTikvaMap() {
     colorScheme: 'light',
   };
 
+  /**
+   * FIFA-ish markings: play runs left↔right (goals on short vertical sides of the grass rect).
+   * Length ~105 → fw, goal line ~68 → fh.
+   */
+  const pitch = useMemo(() => {
+    const fx = HATIKVA_FIELD_X;
+    const fy = HATIKVA_FIELD_Y;
+    const fw = HATIKVA_FIELD_W;
+    const fh = HATIKVA_FIELD_H;
+    const cx = fx + fw / 2;
+    const cy = fy + fh / 2;
+    const line = '#f8fafc';
+    const m = Math.min(fw / 105, fh / 68);
+    const centerR = 9.15 * m;
+    const paDepth = (16.5 / 105) * fw;
+    const paSpan = (40.32 / 68) * fh;
+    const gaDepth = (5.5 / 105) * fw;
+    const gaSpan = (18.32 / 68) * fh;
+    const spotD = (11 / 105) * fw;
+    const cornerR = Math.min(fw, fh) * 0.014;
+    const gmouthSpan = fh * 0.22;
+    const netDepth = Math.max(26, fw * 0.016);
+    const spotXL = fx + spotD;
+    const spotXR = fx + fw - spotD;
+    const postW = Math.max(5, fh * 0.02);
+    return {
+      fx,
+      fy,
+      fw,
+      fh,
+      cx,
+      cy,
+      line,
+      centerR,
+      paDepth,
+      paSpan,
+      gaDepth,
+      gaSpan,
+      spotD,
+      cornerR,
+      gmouthSpan,
+      netDepth,
+      spotXL,
+      spotXR,
+      postW,
+    };
+  }, []);
+
   return (
     <>
-      <div className="flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-[#eef1f6] text-slate-800">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur-sm">
-          <h1 className="text-base font-semibold tracking-tight text-slate-800">HaTikva Neighborhood Stadium</h1>
+      <div
+        className="flex w-full min-h-[100svh] min-h-[100dvh] flex-col overflow-hidden text-slate-800 [color-scheme:light]"
+        style={{ minHeight: 'max(100dvh, 100svh)', backgroundColor: HATIKVA_CANVAS_BG }}
+      >
+        <div
+          className="flex flex-shrink-0 items-center justify-between border-b border-slate-400/20 px-4 py-2.5 shadow-sm"
+          style={{ backgroundColor: HATIKVA_CANVAS_BG }}
+        >
+          <h1 className="text-base font-semibold tracking-tight text-slate-800">
+            {isHe ? 'אצטדיון שכונת התקווה' : 'HaTikva Neighborhood Stadium'}
+          </h1>
           <div className="flex items-center gap-3 text-xs tabular-nums text-slate-500 sm:text-sm">
             <span>{Math.round(zoom * 100)}%</span>
             <span className="text-slate-300">·</span>
@@ -364,7 +461,8 @@ export default function HaTikvaMap() {
 
         <div
           ref={containerRef}
-          className="relative flex min-h-0 flex-1 cursor-grab overflow-hidden bg-[#e4e9f2] active:cursor-grabbing"
+          className="relative flex min-h-0 flex-1 cursor-grab overflow-hidden active:cursor-grabbing"
+          style={{ backgroundColor: HATIKVA_CANVAS_BG }}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -411,98 +509,225 @@ export default function HaTikvaMap() {
               preserveAspectRatio="xMidYMid meet"
             >
               <defs>
-                <linearGradient id="hatikva-grass" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6cbd6e" />
-                  <stop offset="100%" stopColor="#4a9d55" />
+                <linearGradient id="hatikva-grass-leaan" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#3d9142" />
+                  <stop offset="45%" stopColor="#2d7a27" />
+                  <stop offset="100%" stopColor="#1e5420" />
                 </linearGradient>
+                <pattern id="hatikva-grass-stripes" width={48} height={48} patternUnits="userSpaceOnUse" patternTransform="rotate(8)">
+                  <rect width={48} height={48} fill="#000" fillOpacity={0} />
+                  <line x1={0} y1={0} x2={48} y2={0} stroke="#000" strokeWidth={14} strokeOpacity={0.045} />
+                </pattern>
               </defs>
-              <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="#e8ecf2" />
+              <rect x={vbX} y={vbY} width={vbW} height={vbH} fill={HATIKVA_CANVAS_BG} />
 
-              <rect
-                x={fieldCx - fieldW / 2}
-                y={fieldCy - fieldH / 2}
-                width={fieldW}
-                height={fieldH}
-                rx={10}
-                fill="url(#hatikva-grass)"
-                stroke="#3d7a46"
-                strokeWidth={3}
-              />
-              <rect
-                x={fieldCx - fieldW / 2}
-                y={fieldCy - fieldH / 2}
-                width={fieldW}
-                height={fieldH}
-                rx={10}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={1.5}
-                strokeOpacity={0.9}
-              />
-              <line
-                x1={fieldCx}
-                y1={fieldCy - fieldH / 2}
-                x2={fieldCx}
-                y2={fieldCy + fieldH / 2}
-                stroke="#e8f5e9"
-                strokeWidth={1}
-                strokeOpacity={0.9}
-              />
-              <circle
-                cx={fieldCx}
-                cy={fieldCy}
-                r={200}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={1}
-                strokeOpacity={0.9}
-              />
-              <circle cx={fieldCx} cy={fieldCy} r={5} fill="#e8f5e9" fillOpacity={0.95} />
-              <rect
-                x={fieldCx - fieldW / 2}
-                y={fieldCy - 300}
-                width={500}
-                height={600}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={0.8}
-                strokeOpacity={0.85}
-              />
-              <rect
-                x={fieldCx + fieldW / 2 - 500}
-                y={fieldCy - 300}
-                width={500}
-                height={600}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={0.8}
-                strokeOpacity={0.85}
-              />
-              <rect
-                x={fieldCx - fieldW / 2}
-                y={fieldCy - 150}
-                width={200}
-                height={300}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={0.8}
-                strokeOpacity={0.85}
-              />
-              <rect
-                x={fieldCx + fieldW / 2 - 200}
-                y={fieldCy - 150}
-                width={200}
-                height={300}
-                fill="none"
-                stroke="#e8f5e9"
-                strokeWidth={0.8}
-                strokeOpacity={0.85}
-              />
+              <g id="hatikva-pitch-leaan">
+                <rect
+                  x={pitch.fx}
+                  y={pitch.fy}
+                  width={pitch.fw}
+                  height={pitch.fh}
+                  rx={14}
+                  fill="url(#hatikva-grass-leaan)"
+                  stroke="#1b4d18"
+                  strokeWidth={5}
+                />
+                <rect x={pitch.fx} y={pitch.fy} width={pitch.fw} height={pitch.fh} rx={14} fill="url(#hatikva-grass-stripes)" />
+
+                <rect
+                  x={pitch.fx}
+                  y={pitch.fy}
+                  width={pitch.fw}
+                  height={pitch.fh}
+                  rx={14}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={3}
+                  strokeOpacity={0.92}
+                />
+
+                {/* Nets outside left/right goal lines */}
+                <g id="hatikva-goals" opacity={0.96}>
+                  <rect
+                    x={pitch.fx - pitch.netDepth}
+                    y={pitch.cy - pitch.gmouthSpan / 2}
+                    width={pitch.netDepth}
+                    height={pitch.gmouthSpan}
+                    rx={4}
+                    fill="#d4dde8"
+                    stroke="#94a3b8"
+                    strokeWidth={2}
+                  />
+                  <rect
+                    x={pitch.fx + pitch.fw}
+                    y={pitch.cy - pitch.gmouthSpan / 2}
+                    width={pitch.netDepth}
+                    height={pitch.gmouthSpan}
+                    rx={4}
+                    fill="#d4dde8"
+                    stroke="#94a3b8"
+                    strokeWidth={2}
+                  />
+                  <line
+                    x1={pitch.fx - pitch.netDepth}
+                    y1={pitch.cy - pitch.gmouthSpan / 2}
+                    x2={pitch.fx + pitch.netDepth * 0.15}
+                    y2={pitch.cy - pitch.gmouthSpan / 2}
+                    stroke={pitch.line}
+                    strokeWidth={Math.max(5, pitch.postW)}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={pitch.fx - pitch.netDepth}
+                    y1={pitch.cy + pitch.gmouthSpan / 2}
+                    x2={pitch.fx + pitch.netDepth * 0.15}
+                    y2={pitch.cy + pitch.gmouthSpan / 2}
+                    stroke={pitch.line}
+                    strokeWidth={Math.max(5, pitch.postW)}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={pitch.fx + pitch.fw - pitch.netDepth * 0.15}
+                    y1={pitch.cy - pitch.gmouthSpan / 2}
+                    x2={pitch.fx + pitch.fw + pitch.netDepth}
+                    y2={pitch.cy - pitch.gmouthSpan / 2}
+                    stroke={pitch.line}
+                    strokeWidth={Math.max(5, pitch.postW)}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={pitch.fx + pitch.fw - pitch.netDepth * 0.15}
+                    y1={pitch.cy + pitch.gmouthSpan / 2}
+                    x2={pitch.fx + pitch.fw + pitch.netDepth}
+                    y2={pitch.cy + pitch.gmouthSpan / 2}
+                    stroke={pitch.line}
+                    strokeWidth={Math.max(5, pitch.postW)}
+                    strokeLinecap="round"
+                  />
+                </g>
+
+                {/* Halfway line (horizontal) — teams left vs right */}
+                <line
+                  x1={pitch.fx}
+                  y1={pitch.cy}
+                  x2={pitch.fx + pitch.fw}
+                  y2={pitch.cy}
+                  stroke={pitch.line}
+                  strokeWidth={2.5}
+                  strokeOpacity={0.9}
+                />
+
+                <circle
+                  cx={pitch.cx}
+                  cy={pitch.cy}
+                  r={pitch.centerR}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={2.5}
+                  strokeOpacity={0.9}
+                />
+                <circle cx={pitch.cx} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
+
+                <rect
+                  x={pitch.fx}
+                  y={pitch.cy - pitch.paSpan / 2}
+                  width={pitch.paDepth}
+                  height={pitch.paSpan}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={2}
+                  strokeOpacity={0.88}
+                />
+                <rect
+                  x={pitch.fx + pitch.fw - pitch.paDepth}
+                  y={pitch.cy - pitch.paSpan / 2}
+                  width={pitch.paDepth}
+                  height={pitch.paSpan}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={2}
+                  strokeOpacity={0.88}
+                />
+
+                <rect
+                  x={pitch.fx}
+                  y={pitch.cy - pitch.gaSpan / 2}
+                  width={pitch.gaDepth}
+                  height={pitch.gaSpan}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.85}
+                />
+                <rect
+                  x={pitch.fx + pitch.fw - pitch.gaDepth}
+                  y={pitch.cy - pitch.gaSpan / 2}
+                  width={pitch.gaDepth}
+                  height={pitch.gaSpan}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.85}
+                />
+
+                <line
+                  x1={pitch.fx}
+                  y1={pitch.cy - pitch.gmouthSpan / 2}
+                  x2={pitch.fx}
+                  y2={pitch.cy + pitch.gmouthSpan / 2}
+                  stroke={pitch.line}
+                  strokeWidth={10}
+                  strokeLinecap="round"
+                  strokeOpacity={0.95}
+                />
+                <line
+                  x1={pitch.fx + pitch.fw}
+                  y1={pitch.cy - pitch.gmouthSpan / 2}
+                  x2={pitch.fx + pitch.fw}
+                  y2={pitch.cy + pitch.gmouthSpan / 2}
+                  stroke={pitch.line}
+                  strokeWidth={10}
+                  strokeLinecap="round"
+                  strokeOpacity={0.95}
+                />
+
+                <circle cx={pitch.spotXL} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
+                <circle cx={pitch.spotXR} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
+
+                <path
+                  d={`M ${pitch.fx + pitch.cornerR} ${pitch.fy} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx} ${pitch.fy + pitch.cornerR}`}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.82}
+                />
+                <path
+                  d={`M ${pitch.fx + pitch.fw - pitch.cornerR} ${pitch.fy} A ${pitch.cornerR} ${pitch.cornerR} 0 0 1 ${pitch.fx + pitch.fw} ${pitch.fy + pitch.cornerR}`}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.82}
+                />
+                <path
+                  d={`M ${pitch.fx} ${pitch.fy + pitch.fh - pitch.cornerR} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx + pitch.cornerR} ${pitch.fy + pitch.fh}`}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.82}
+                />
+                <path
+                  d={`M ${pitch.fx + pitch.fw - pitch.cornerR} ${pitch.fy + pitch.fh} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx + pitch.fw} ${pitch.fy + pitch.fh - pitch.cornerR}`}
+                  fill="none"
+                  stroke={pitch.line}
+                  strokeWidth={1.8}
+                  strokeOpacity={0.82}
+                />
+              </g>
 
               {data.sections.map((section) => {
                 const isSelected = selectedSection === section.idx;
                 const isHovered = hoveredSection === section.idx;
-                const fill = friendlyFill(section.fill);
+                const fill = leaanSectionFill(section);
                 const strokeColor = isSelected ? '#0f766e' : isHovered ? '#0d9488' : '#ffffff';
                 return (
                   <path
@@ -528,7 +753,8 @@ export default function HaTikvaMap() {
 
               {zoom >= 0.6 &&
                 data.sections.map((section) => {
-                  const fontSize = Math.max(20, Math.min(80, (Math.sqrt(section.seatCount) / 8) * 30));
+                  const fontSize = sectionMapFontSize(section.seatCount);
+                  const ls = leaanLabelStyle(section);
                   return (
                     <text
                       key={`label-${section.idx}`}
@@ -536,15 +762,15 @@ export default function HaTikvaMap() {
                       y={section.centroidY}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fill="#1e293b"
-                      fillOpacity={0.85}
-                      stroke="#ffffff"
-                      strokeWidth={fontSize * 0.06}
-                      strokeOpacity={0.45}
+                      fill={ls.fill}
+                      fillOpacity={1}
+                      stroke={ls.stroke}
+                      strokeWidth={ls.strokeW}
+                      strokeOpacity={ls.strokeOp}
                       paintOrder="stroke fill"
                       fontSize={fontSize}
-                      fontWeight="600"
-                      fontFamily="system-ui, Segoe UI, Arial, sans-serif"
+                      fontWeight="800"
+                      fontFamily="system-ui, 'Segoe UI', Arial, sans-serif"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >
                       {section.name}
@@ -571,11 +797,11 @@ export default function HaTikvaMap() {
                         data-seat-dot
                         cx={seat.cx}
                         cy={seat.cy}
-                        r={isSel ? 6 : 4}
-                        fill={friendlyFill(seat.fill)}
-                        fillOpacity={isSel ? 1 : 0.88}
-                        stroke={isSel ? '#0f766e' : '#fff'}
-                        strokeWidth={isSel ? 2 : 1}
+                        r={isSel ? 6.5 : 4.5}
+                        fill={leaanSeatDisplayFill(seat, data.sections)}
+                        fillOpacity={isSel ? 1 : 0.92}
+                        stroke={isSel ? '#0f766e' : '#5c5c5c'}
+                        strokeWidth={isSel ? 2.2 : 0.85}
                         className="transition-[r,stroke-width] duration-150"
                         style={{ cursor: 'pointer' }}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -588,15 +814,23 @@ export default function HaTikvaMap() {
 
               {GATE_POSITIONS.map(({ gate, x, y, label }) => (
                 <g key={gate}>
-                  <rect x={x - 80} y={y - 28} width={160} height={56} rx={10} fill="#475569" fillOpacity={0.92} />
+                  <rect
+                    x={x - gateBadgePadX}
+                    y={y - gateBadgePadY / 2}
+                    width={gateBadgePadX * 2}
+                    height={gateBadgePadY}
+                    rx={vbW * 0.0016}
+                    fill="#1e293b"
+                    fillOpacity={0.97}
+                  />
                   <text
                     x={x}
-                    y={y + 7}
+                    y={y + gateBadgeFontSize * 0.28}
                     textAnchor="middle"
                     fill="#f8fafc"
-                    fontSize={30}
-                    fontWeight="600"
-                    fontFamily="system-ui,Segoe UI,sans-serif"
+                    fontSize={gateBadgeFontSize}
+                    fontWeight="800"
+                    fontFamily="system-ui,Segoe UI,Arial,sans-serif"
                     style={{ pointerEvents: 'none' }}
                   >
                     {label}
@@ -633,29 +867,24 @@ export default function HaTikvaMap() {
             >
               {isHe ? 'איפוס' : 'Reset'}
             </button>
-            {selectedSection !== null && (
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="flex h-8 items-center rounded-lg bg-rose-100 px-2.5 text-xs font-medium text-rose-900 transition hover:bg-rose-200"
-              >
-                {isHe ? 'סגור' : 'Close'}
-              </button>
-            )}
           </div>
 
-          {hoveredSection !== null && !panelSection && (
-            <div className="pointer-events-none absolute start-3 top-3 z-20 rounded-lg border border-slate-200 bg-white/95 px-3 py-1.5 text-xs text-slate-700 shadow-md">
-              {isHe ? 'אזור' : 'Section'} {data.sections.find((s) => s.idx === hoveredSection)?.name} (
-              {data.sections.find((s) => s.idx === hoveredSection)?.seatCount} {isHe ? 'מושבים' : 'seats'})
+          {hoveredSection !== null && !panelSection && (() => {
+            const hs = data.sections.find((s) => s.idx === hoveredSection);
+            const hGate = hs && /^שער\s*\d/.test(hs.name.trim());
+            return (
+            <div className="pointer-events-none absolute start-3 top-3 z-20 rounded-lg border border-slate-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md">
+              {hGate ? (isHe ? 'שער' : 'Gate') : isHe ? 'אזור' : 'Section'} {hs?.name} (
+              {hs?.seatCount} {isHe ? 'מושבים' : 'seats'})
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
       {panelSection && (
         <aside
-          className="overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl p-0 backdrop-blur-sm sm:rounded-[1.25rem] [&_a]:no-underline"
+          className="overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl p-0 shadow-xl sm:rounded-[1.25rem] [&_a]:no-underline"
           style={selectionPanelStyle}
           dir={isHe ? 'rtl' : 'ltr'}
           onClick={(e) => e.stopPropagation()}
@@ -663,93 +892,87 @@ export default function HaTikvaMap() {
           role="complementary"
           aria-label={isHe ? 'סל בחירה — התקווה' : 'Selection — HaTikva'}
         >
-          <div className="h-1.5 rounded-t-2xl bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500 sm:rounded-t-[1.25rem]" aria-hidden />
-
-          <div className="p-4 sm:p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-teal-800/80">
-                  {isHe ? 'בחירת מושבים' : 'Seat selection'}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
-                    style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
-                  >
-                    {panelSection.name}
-                  </span>
-                  <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200/80 text-xl leading-none text-slate-600 transition hover:bg-slate-300 hover:text-slate-900"
-                aria-label={isHe ? 'סגור' : 'Close'}
-              >
-                &times;
-              </button>
+          {/* Leaan-style peach header + section dot */}
+          <div className="rounded-t-2xl border-b border-amber-900/10 bg-[#f0e4d8] px-4 py-3.5 sm:rounded-t-[1.25rem]">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-900/55">
+              {isHe ? 'בחירת מושבים' : 'Seat selection'}
+            </p>
+            <div className="flex items-center gap-2.5">
+              <span
+                className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white shadow-sm"
+                style={{ backgroundColor: leaanSectionFill(panelSection) }}
+              />
+              <span className="min-w-0 text-lg font-bold leading-snug text-slate-900">{panelSection.name}</span>
             </div>
+          </div>
 
-            <dl className="space-y-0 rounded-xl border border-slate-200/90 bg-white/70 text-sm shadow-inner shadow-slate-900/5">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5">
-                <dt className="text-slate-500">{isHe ? 'יציע' : 'Stand'}</dt>
-                <dd className="font-semibold capitalize text-slate-800">{panelSection.stand}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5">
-                <dt className="shrink-0 text-slate-500">{isHe ? 'צבע האזור' : 'Zone color'}</dt>
-                <dd className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-5 w-5 shrink-0 rounded-full ring-2 ring-white ring-offset-1 ring-offset-slate-100"
-                    style={{ backgroundColor: friendlyFill(panelSection.fill) }}
-                  />
-                  <span className="truncate font-mono text-xs text-slate-600">{friendlyFill(panelSection.fill)}</span>
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <dt className="text-slate-500">{isHe ? 'מושבים באזור' : 'Capacity'}</dt>
-                <dd className="font-bold tabular-nums text-slate-900">{panelSection.seatCount.toLocaleString()}</dd>
-              </div>
-            </dl>
-
-            {showSeats && selectedSeats.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                    {isHe ? 'הבחירה שלכם' : 'Your picks'}{' '}
-                    <span className="tabular-nums text-teal-700">({selectedSeats.length})</span>
-                  </h4>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-teal-700 underline-offset-2 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSeats([]);
-                    }}
-                  >
-                    {isHe ? 'נקה הכל' : 'Clear all'}
-                  </button>
+          <div className="border-t border-slate-200/80 bg-white px-4 py-4 sm:px-5">
+            {(() => {
+              const primary =
+                selectedSeats.length > 0 ? selectedSeats[selectedSeats.length - 1]! : null;
+              const lbl = primary ? seatLabels.get(seatKey(primary)) : null;
+              const gateNum = hatikvaNearestGate(panelSection);
+              const blockStr = hatikvaDisplayBlock(panelSection);
+              const isGateArea = /^שער\s*\d/.test(panelSection.name.trim());
+              const cells = [
+                {
+                  lab: isGateArea ? (isHe ? 'שער' : 'Gate') : isHe ? 'אזור' : 'Section',
+                  val: panelSection.name,
+                },
+                { lab: isHe ? 'בלוק' : 'Block', val: blockStr },
+                { lab: isHe ? 'שורה' : 'Row', val: lbl ? String(lbl.row) : '—' },
+                { lab: isHe ? 'מושב' : 'Seat', val: lbl ? String(lbl.seat) : '—' },
+                { lab: isHe ? 'שער' : 'Gate', val: String(gateNum) },
+              ];
+              return (
+                <div className="mb-4 grid grid-cols-5 gap-0.5 border-b border-slate-200 pb-4 text-center sm:gap-1">
+                  {cells.map((c) => (
+                    <div key={c.lab} className="min-w-0 px-0.5">
+                      <div className="mb-1 text-[10px] font-medium leading-tight text-slate-500 sm:text-[11px]">
+                        {c.lab}
+                      </div>
+                      <div className="truncate text-sm font-extrabold tabular-nums text-slate-900 sm:text-base">
+                        {c.val}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-0.5">
+              );
+            })()}
+
+            <p className="mb-4 text-center text-[11px] text-slate-500">
+              {isHe ? 'מיקום ביציע' : 'Stand'} ·{' '}
+              <span className="font-semibold capitalize text-slate-700">{panelSection.stand}</span>
+              {' · '}
+              {isHe ? 'קיבולת' : 'Cap.'}{' '}
+              <span className="font-semibold tabular-nums text-slate-700">
+                {panelSection.seatCount.toLocaleString()}
+              </span>
+            </p>
+
+            {showSeats && selectedSeats.length > 1 && (
+              <div className="mb-4 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/90 px-2 py-2">
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {isHe ? 'נבחרו' : 'Selected'} ({selectedSeats.length})
+                </p>
+                <ul className="space-y-1">
                   {selectedSeats.map((s) => {
                     const lbl = seatLabels.get(seatKey(s));
-                    const label = lbl
+                    const t = lbl
                       ? isHe
-                        ? `שורה ${lbl.row} · מושב ${lbl.seat}`
-                        : `Row ${lbl.row} · Seat ${lbl.seat}`
-                      : isHe
-                        ? 'מושב במפה'
-                        : 'Map seat';
+                        ? `ש׳ ${lbl.row} · מ׳ ${lbl.seat}`
+                        : `R${lbl.row} S${lbl.seat}`
+                      : '—';
                     return (
                       <li
                         key={seatKey(s)}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                        className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1 text-[11px] text-slate-800"
                       >
-                        <span className="min-w-0 truncate font-medium tabular-nums">{label}</span>
+                        <span className="tabular-nums">{t}</span>
                         <button
                           type="button"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-lg text-slate-500 transition hover:bg-rose-100 hover:text-rose-700"
-                          aria-label={isHe ? 'הסר מושב' : 'Remove seat'}
+                          className="text-slate-400 hover:text-rose-600"
+                          aria-label={isHe ? 'הסר' : 'Remove'}
                           onClick={(e) => {
                             e.stopPropagation();
                             const k = seatKey(s);
@@ -762,34 +985,63 @@ export default function HaTikvaMap() {
                     );
                   })}
                 </ul>
+              </div>
+            )}
+
+            {showSeats && selectedSeats.length > 0 && (
+              <div className="space-y-3">
                 <p className="text-[11px] leading-snug text-slate-500">
                   {isHe
-                    ? 'מספור שורות מאוחד גם כשיש רווח באמצע אותה שורה במפה.'
-                    : 'Row numbers treat one row with a gap as a single row.'}
+                    ? 'המספר האחרון בשורה למעלה הוא המושב שנבחר לאחרונה (כמו באתר הרכישה).'
+                    : 'The row above shows the last seat tapped, like the purchase flow.'}
                 </p>
-                <Link
-                  href={`/${locale}/events${purchaseQuery ? `?${purchaseQuery}` : ''}`}
-                  className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-teal-900/25 transition hover:from-teal-500 hover:to-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2"
+                {purchaseQuery ? (
+                  <Link
+                    href={`/${locale}/events?${purchaseQuery}`}
+                    className="flex w-full items-center justify-center rounded-md bg-slate-700 px-4 py-3.5 text-xs font-bold uppercase tracking-wide text-white shadow transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  >
+                    {isHe ? 'המשך לרכישה' : 'Continue to purchase'}
+                  </Link>
+                ) : (
+                  <div className="rounded-md border-2 border-dashed border-slate-300 bg-slate-100 px-4 py-3.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {isHe ? 'בחרו מושבים' : 'Select seats'}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="w-full text-center text-[11px] font-semibold text-slate-500 underline-offset-2 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSeats([]);
+                  }}
                 >
-                  {isHe ? 'המשך לרכישה' : 'Continue to purchase'}
-                </Link>
+                  {isHe ? 'נקה בחירת מושבים' : 'Clear seat selection'}
+                </button>
               </div>
             )}
 
             {showSeats && selectedSeats.length === 0 && (
-              <div className="mt-4 space-y-2 rounded-xl bg-slate-100/90 px-3 py-3 text-center text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
-                <p>
+              <div className="mb-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-center text-xs text-slate-600">
+                <p className="font-medium">
                   {isHe
-                    ? 'לחצו על הנקודות על המפה — אפשר לבחור כמה מושבים.'
-                    : 'Tap dots on the map — you can select multiple seats.'}
+                    ? 'בחרו מושבים במפה — הנקודות האפורות והחומות.'
+                    : 'Pick seats on the map (grey and terracotta dots).'}
                 </p>
-                <p className="text-[11px] font-normal text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   {isHe
-                    ? 'Esc או לחיצה בפס הצדדיים מחזירים לתצוגת אצטדיון מלא.'
-                    : 'Esc or the side strips return to the full stadium view.'}
+                    ? 'Esc או פסים בצדי המסך חוזרים לכל האצטדיון.'
+                    : 'Esc or side strips return to the full stadium.'}
                 </p>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="mt-5 w-full rounded-xl border-2 border-slate-800 bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+            >
+              {isHe ? 'סגור' : 'Close'}
+            </button>
           </div>
         </aside>
       )}

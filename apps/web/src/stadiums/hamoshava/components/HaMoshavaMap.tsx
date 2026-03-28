@@ -582,15 +582,6 @@ export default function HaMoshavaMap() {
             >
               {isHe ? 'איפוס' : 'Reset'}
             </button>
-            {selectedSection !== null && (
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="flex h-8 items-center rounded-lg bg-rose-100 px-2.5 text-xs font-medium text-rose-900 transition hover:bg-rose-200"
-              >
-                {isHe ? 'סגור' : 'Close'}
-              </button>
-            )}
           </div>
 
           {hoveredSection !== null && !panelSection && (
@@ -615,29 +606,19 @@ export default function HaMoshavaMap() {
           <div className="h-1.5 rounded-t-2xl bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500 sm:rounded-t-[1.25rem]" aria-hidden />
 
           <div className="p-4 sm:p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-teal-800/80">
-                  {isHe ? 'בחירת מושבים' : 'Seat selection'}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
-                    style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
-                  >
-                    {panelSection.name}
-                  </span>
-                  <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
-                </div>
+            <div className="mb-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-teal-800/80">
+                {isHe ? 'בחירת מושבים' : 'Seat selection'}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
+                  style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
+                >
+                  {panelSection.name}
+                </span>
+                <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
               </div>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200/80 text-xl leading-none text-slate-600 transition hover:bg-slate-300 hover:text-slate-900"
-                aria-label={isHe ? 'סגור' : 'Close'}
-              >
-                &times;
-              </button>
             </div>
 
             <dl className="space-y-0 rounded-xl border border-slate-200/90 bg-white/70 text-sm shadow-inner shadow-slate-900/5">
@@ -739,6 +720,14 @@ export default function HaMoshavaMap() {
                 </p>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="mt-5 w-full rounded-xl border-2 border-slate-800 bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+            >
+              {isHe ? 'סגור' : 'Close'}
+            </button>
           </div>
         </aside>
       )}

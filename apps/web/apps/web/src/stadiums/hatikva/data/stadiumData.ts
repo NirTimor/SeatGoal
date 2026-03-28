@@ -35,7 +35,7 @@ export const GATE_POSITIONS = [
   { gate: 2, x: 1600, y: 1200, label: 'שער 2' },
   { gate: 3, x: 4100, y: 1200, label: 'שער 3' },
   { gate: 4, x: 5800, y: 1200, label: 'שער 4' },
-  { gate: 5, x: 7638, y: 2100, label: 'שער 5' },
+  { gate: 5, x: 7638, y: 2100, label: 'יציע 5' },
 ];
 
 // Section path data (5 sections)
@@ -86,7 +86,7 @@ const SECTION_PATHS: RealSection[] = [
   },
   {
     idx: 4,
-    name: "שער 5",
+    name: "יציע 5",
     stand: "south",
     fill: "#C45100",
     stroke: "rgba(208.75, 93.75, 12.75, 1)",

@@ -810,11 +810,6 @@ export default function BloomfieldMap() {
             <button type="button" onClick={resetView} className="px-2.5 h-8 flex items-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
               {locale === 'he' ? 'הכל' : 'All'}
             </button>
-            {selectedSection !== null && (
-              <button type="button" onClick={clearSelection} className="px-2.5 h-8 flex items-center rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 text-xs font-medium transition">
-                {locale === 'he' ? 'סגור' : 'Close'}
-              </button>
-            )}
           </div>
 
           {hoveredSection !== null && !panelSection && (
@@ -840,29 +835,19 @@ export default function BloomfieldMap() {
           <div className="h-1.5 rounded-t-2xl bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500 sm:rounded-t-[1.25rem]" aria-hidden />
 
           <div className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-teal-800/80 mb-1">
-                  {locale === 'he' ? 'בחירת מושבים' : 'Seat selection'}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
-                    style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
-                  >
-                    {panelSection.name}
-                  </span>
-                  <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
-                </div>
+            <div className="mb-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-teal-800/80">
+                {locale === 'he' ? 'בחירת מושבים' : 'Seat selection'}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
+                  style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
+                >
+                  {panelSection.name}
+                </span>
+                <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
               </div>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-slate-200/80 text-slate-600 text-xl leading-none transition hover:bg-slate-300 hover:text-slate-900"
-                aria-label={locale === 'he' ? 'סגור' : 'Close'}
-              >
-                &times;
-              </button>
             </div>
 
             <dl className="space-y-0 rounded-xl border border-slate-200/90 bg-white/70 text-sm shadow-inner shadow-slate-900/5">
@@ -964,6 +949,14 @@ export default function BloomfieldMap() {
                 </p>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="mt-5 w-full rounded-xl border-2 border-slate-800 bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+            >
+              {locale === 'he' ? 'סגור' : 'Close'}
+            </button>
           </div>
         </aside>
       )}
