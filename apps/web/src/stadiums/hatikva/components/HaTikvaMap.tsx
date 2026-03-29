@@ -392,37 +392,58 @@ export default function HaTikvaMap() {
   };
 
   /**
-   * FIFA-ish markings: play runs left↔right (goals on short vertical sides of the grass rect).
-   * Length ~105 → fw, goal line ~68 → fh.
+   * Grass pad (fx…fw×fh) with FIFA play area inset — white touchlines sit inside the green like a real pitch.
+   * Touchline length 105 m → iw, goal-line width 68 m → ih. Goals left/right.
    */
   const pitch = useMemo(() => {
     const fx = HATIKVA_FIELD_X;
     const fy = HATIKVA_FIELD_Y;
     const fw = HATIKVA_FIELD_W;
     const fh = HATIKVA_FIELD_H;
-    const cx = fx + fw / 2;
-    const cy = fy + fh / 2;
+    const grassInset = Math.min(fw, fh) * 0.042;
+    const ix = fx + grassInset;
+    const iy = fy + grassInset;
+    const iw = fw - 2 * grassInset;
+    const ih = fh - 2 * grassInset;
+    const icx = ix + iw / 2;
+    const icy = iy + ih / 2;
     const line = '#f8fafc';
-    const m = Math.min(fw / 105, fh / 68);
-    const centerR = 9.15 * m;
-    const paDepth = (16.5 / 105) * fw;
-    const paSpan = (40.32 / 68) * fh;
-    const gaDepth = (5.5 / 105) * fw;
-    const gaSpan = (18.32 / 68) * fh;
-    const spotD = (11 / 105) * fw;
-    const cornerR = Math.min(fw, fh) * 0.014;
-    const gmouthSpan = fh * 0.22;
+    const mPxPerM = Math.min(iw / 105, ih / 68);
+    const centerR = 9.15 * mPxPerM;
+    /** Anisotropic metres→px so circles on the real pitch map to correct ellipses in SVG (iw:ih ≠ 105:68). */
+    const rxPenM = (9.15 * iw) / 105;
+    const ryPenM = (9.15 * ih) / 68;
+    const paDepth = (16.5 / 105) * iw;
+    const paSpan = (40.32 / 68) * ih;
+    const gaDepth = (5.5 / 105) * iw;
+    const gaSpan = (18.32 / 68) * ih;
+    const spotD = (11 / 105) * iw;
+    const cR = Math.max(2.25, 1 * mPxPerM);
+    const innerBoundaryPath = `M ${ix + cR} ${iy} L ${ix + iw - cR} ${iy} A ${cR} ${cR} 0 0 1 ${ix + iw} ${iy + cR} L ${ix + iw} ${iy + ih - cR} A ${cR} ${cR} 0 0 1 ${ix + iw - cR} ${iy + ih} L ${ix + cR} ${iy + ih} A ${cR} ${cR} 0 0 1 ${ix} ${iy + ih - cR} L ${ix} ${iy + cR} A ${cR} ${cR} 0 0 1 ${ix + cR} ${iy} Z`;
+    const gmouthSpan = ih * 0.22;
     const netDepth = Math.max(26, fw * 0.016);
-    const spotXL = fx + spotD;
-    const spotXR = fx + fw - spotD;
-    const postW = Math.max(5, fh * 0.02);
+    const spotXL = ix + spotD;
+    const spotXR = ix + iw - spotD;
+    const postW = Math.max(5, ih * 0.02);
+    const dxSpotToPaFront = paDepth - spotD;
+    const cosPen = Math.min(1, Math.max(-1, dxSpotToPaFront / rxPenM));
+    const paArcH = ryPenM * Math.sqrt(Math.max(0, 1 - cosPen * cosPen));
+    const paLineLeftX = ix + paDepth;
+    const paLineRightX = ix + iw - paDepth;
+    /* sweep faces the arc toward midfield (+x left side, −x right side) */
+    const penaltyArcLeft = `M ${paLineLeftX} ${icy - paArcH} A ${rxPenM} ${ryPenM} 0 0 1 ${paLineLeftX} ${icy + paArcH}`;
+    const penaltyArcRight = `M ${paLineRightX} ${icy - paArcH} A ${rxPenM} ${ryPenM} 0 0 0 ${paLineRightX} ${icy + paArcH}`;
     return {
       fx,
       fy,
       fw,
       fh,
-      cx,
-      cy,
+      ix,
+      iy,
+      iw,
+      ih,
+      icx,
+      icy,
       line,
       centerR,
       paDepth,
@@ -430,12 +451,15 @@ export default function HaTikvaMap() {
       gaDepth,
       gaSpan,
       spotD,
-      cornerR,
+      cR,
+      innerBoundaryPath,
       gmouthSpan,
       netDepth,
       spotXL,
       spotXR,
       postW,
+      penaltyArcLeft,
+      penaltyArcRight,
     };
   }, []);
 
@@ -536,23 +560,21 @@ export default function HaTikvaMap() {
                 />
                 <rect x={pitch.fx} y={pitch.fy} width={pitch.fw} height={pitch.fh} rx={14} fill="url(#hatikva-grass-stripes)" />
 
-                <rect
-                  x={pitch.fx}
-                  y={pitch.fy}
-                  width={pitch.fw}
-                  height={pitch.fh}
-                  rx={14}
+                {/* FIFA touchlines + 1 m corner arcs — inside grass pad */}
+                <path
+                  d={pitch.innerBoundaryPath}
                   fill="none"
                   stroke={pitch.line}
-                  strokeWidth={3}
-                  strokeOpacity={0.92}
+                  strokeWidth={2.75}
+                  strokeOpacity={0.94}
+                  strokeLinejoin="round"
                 />
 
-                {/* Nets outside left/right goal lines */}
+                {/* Nets outside inner goal lines */}
                 <g id="hatikva-goals" opacity={0.96}>
                   <rect
-                    x={pitch.fx - pitch.netDepth}
-                    y={pitch.cy - pitch.gmouthSpan / 2}
+                    x={pitch.ix - pitch.netDepth}
+                    y={pitch.icy - pitch.gmouthSpan / 2}
                     width={pitch.netDepth}
                     height={pitch.gmouthSpan}
                     rx={4}
@@ -561,8 +583,8 @@ export default function HaTikvaMap() {
                     strokeWidth={2}
                   />
                   <rect
-                    x={pitch.fx + pitch.fw}
-                    y={pitch.cy - pitch.gmouthSpan / 2}
+                    x={pitch.ix + pitch.iw}
+                    y={pitch.icy - pitch.gmouthSpan / 2}
                     width={pitch.netDepth}
                     height={pitch.gmouthSpan}
                     rx={4}
@@ -571,68 +593,68 @@ export default function HaTikvaMap() {
                     strokeWidth={2}
                   />
                   <line
-                    x1={pitch.fx - pitch.netDepth}
-                    y1={pitch.cy - pitch.gmouthSpan / 2}
-                    x2={pitch.fx + pitch.netDepth * 0.15}
-                    y2={pitch.cy - pitch.gmouthSpan / 2}
+                    x1={pitch.ix - pitch.netDepth}
+                    y1={pitch.icy - pitch.gmouthSpan / 2}
+                    x2={pitch.ix + pitch.netDepth * 0.15}
+                    y2={pitch.icy - pitch.gmouthSpan / 2}
                     stroke={pitch.line}
                     strokeWidth={Math.max(5, pitch.postW)}
                     strokeLinecap="round"
                   />
                   <line
-                    x1={pitch.fx - pitch.netDepth}
-                    y1={pitch.cy + pitch.gmouthSpan / 2}
-                    x2={pitch.fx + pitch.netDepth * 0.15}
-                    y2={pitch.cy + pitch.gmouthSpan / 2}
+                    x1={pitch.ix - pitch.netDepth}
+                    y1={pitch.icy + pitch.gmouthSpan / 2}
+                    x2={pitch.ix + pitch.netDepth * 0.15}
+                    y2={pitch.icy + pitch.gmouthSpan / 2}
                     stroke={pitch.line}
                     strokeWidth={Math.max(5, pitch.postW)}
                     strokeLinecap="round"
                   />
                   <line
-                    x1={pitch.fx + pitch.fw - pitch.netDepth * 0.15}
-                    y1={pitch.cy - pitch.gmouthSpan / 2}
-                    x2={pitch.fx + pitch.fw + pitch.netDepth}
-                    y2={pitch.cy - pitch.gmouthSpan / 2}
+                    x1={pitch.ix + pitch.iw - pitch.netDepth * 0.15}
+                    y1={pitch.icy - pitch.gmouthSpan / 2}
+                    x2={pitch.ix + pitch.iw + pitch.netDepth}
+                    y2={pitch.icy - pitch.gmouthSpan / 2}
                     stroke={pitch.line}
                     strokeWidth={Math.max(5, pitch.postW)}
                     strokeLinecap="round"
                   />
                   <line
-                    x1={pitch.fx + pitch.fw - pitch.netDepth * 0.15}
-                    y1={pitch.cy + pitch.gmouthSpan / 2}
-                    x2={pitch.fx + pitch.fw + pitch.netDepth}
-                    y2={pitch.cy + pitch.gmouthSpan / 2}
+                    x1={pitch.ix + pitch.iw - pitch.netDepth * 0.15}
+                    y1={pitch.icy + pitch.gmouthSpan / 2}
+                    x2={pitch.ix + pitch.iw + pitch.netDepth}
+                    y2={pitch.icy + pitch.gmouthSpan / 2}
                     stroke={pitch.line}
                     strokeWidth={Math.max(5, pitch.postW)}
                     strokeLinecap="round"
                   />
                 </g>
 
-                {/* Halfway line (horizontal) — teams left vs right */}
+                {/* Halfway line (vertical) — goals left & right */}
                 <line
-                  x1={pitch.fx}
-                  y1={pitch.cy}
-                  x2={pitch.fx + pitch.fw}
-                  y2={pitch.cy}
+                  x1={pitch.icx}
+                  y1={pitch.iy}
+                  x2={pitch.icx}
+                  y2={pitch.iy + pitch.ih}
                   stroke={pitch.line}
                   strokeWidth={2.5}
                   strokeOpacity={0.9}
                 />
 
                 <circle
-                  cx={pitch.cx}
-                  cy={pitch.cy}
+                  cx={pitch.icx}
+                  cy={pitch.icy}
                   r={pitch.centerR}
                   fill="none"
                   stroke={pitch.line}
                   strokeWidth={2.5}
                   strokeOpacity={0.9}
                 />
-                <circle cx={pitch.cx} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
+                <circle cx={pitch.icx} cy={pitch.icy} r={5} fill={pitch.line} fillOpacity={0.95} />
 
                 <rect
-                  x={pitch.fx}
-                  y={pitch.cy - pitch.paSpan / 2}
+                  x={pitch.ix}
+                  y={pitch.icy - pitch.paSpan / 2}
                   width={pitch.paDepth}
                   height={pitch.paSpan}
                   fill="none"
@@ -641,8 +663,8 @@ export default function HaTikvaMap() {
                   strokeOpacity={0.88}
                 />
                 <rect
-                  x={pitch.fx + pitch.fw - pitch.paDepth}
-                  y={pitch.cy - pitch.paSpan / 2}
+                  x={pitch.ix + pitch.iw - pitch.paDepth}
+                  y={pitch.icy - pitch.paSpan / 2}
                   width={pitch.paDepth}
                   height={pitch.paSpan}
                   fill="none"
@@ -652,8 +674,8 @@ export default function HaTikvaMap() {
                 />
 
                 <rect
-                  x={pitch.fx}
-                  y={pitch.cy - pitch.gaSpan / 2}
+                  x={pitch.ix}
+                  y={pitch.icy - pitch.gaSpan / 2}
                   width={pitch.gaDepth}
                   height={pitch.gaSpan}
                   fill="none"
@@ -662,8 +684,8 @@ export default function HaTikvaMap() {
                   strokeOpacity={0.85}
                 />
                 <rect
-                  x={pitch.fx + pitch.fw - pitch.gaDepth}
-                  y={pitch.cy - pitch.gaSpan / 2}
+                  x={pitch.ix + pitch.iw - pitch.gaDepth}
+                  y={pitch.icy - pitch.gaSpan / 2}
                   width={pitch.gaDepth}
                   height={pitch.gaSpan}
                   fill="none"
@@ -673,56 +695,42 @@ export default function HaTikvaMap() {
                 />
 
                 <line
-                  x1={pitch.fx}
-                  y1={pitch.cy - pitch.gmouthSpan / 2}
-                  x2={pitch.fx}
-                  y2={pitch.cy + pitch.gmouthSpan / 2}
+                  x1={pitch.ix}
+                  y1={pitch.icy - pitch.gmouthSpan / 2}
+                  x2={pitch.ix}
+                  y2={pitch.icy + pitch.gmouthSpan / 2}
                   stroke={pitch.line}
                   strokeWidth={10}
                   strokeLinecap="round"
                   strokeOpacity={0.95}
                 />
                 <line
-                  x1={pitch.fx + pitch.fw}
-                  y1={pitch.cy - pitch.gmouthSpan / 2}
-                  x2={pitch.fx + pitch.fw}
-                  y2={pitch.cy + pitch.gmouthSpan / 2}
+                  x1={pitch.ix + pitch.iw}
+                  y1={pitch.icy - pitch.gmouthSpan / 2}
+                  x2={pitch.ix + pitch.iw}
+                  y2={pitch.icy + pitch.gmouthSpan / 2}
                   stroke={pitch.line}
                   strokeWidth={10}
                   strokeLinecap="round"
                   strokeOpacity={0.95}
                 />
 
-                <circle cx={pitch.spotXL} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
-                <circle cx={pitch.spotXR} cy={pitch.cy} r={5} fill={pitch.line} fillOpacity={0.95} />
+                <circle cx={pitch.spotXL} cy={pitch.icy} r={5} fill={pitch.line} fillOpacity={0.95} />
+                <circle cx={pitch.spotXR} cy={pitch.icy} r={5} fill={pitch.line} fillOpacity={0.95} />
 
                 <path
-                  d={`M ${pitch.fx + pitch.cornerR} ${pitch.fy} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx} ${pitch.fy + pitch.cornerR}`}
+                  d={pitch.penaltyArcLeft}
                   fill="none"
                   stroke={pitch.line}
-                  strokeWidth={1.8}
-                  strokeOpacity={0.82}
+                  strokeWidth={2}
+                  strokeOpacity={0.88}
                 />
                 <path
-                  d={`M ${pitch.fx + pitch.fw - pitch.cornerR} ${pitch.fy} A ${pitch.cornerR} ${pitch.cornerR} 0 0 1 ${pitch.fx + pitch.fw} ${pitch.fy + pitch.cornerR}`}
+                  d={pitch.penaltyArcRight}
                   fill="none"
                   stroke={pitch.line}
-                  strokeWidth={1.8}
-                  strokeOpacity={0.82}
-                />
-                <path
-                  d={`M ${pitch.fx} ${pitch.fy + pitch.fh - pitch.cornerR} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx + pitch.cornerR} ${pitch.fy + pitch.fh}`}
-                  fill="none"
-                  stroke={pitch.line}
-                  strokeWidth={1.8}
-                  strokeOpacity={0.82}
-                />
-                <path
-                  d={`M ${pitch.fx + pitch.fw - pitch.cornerR} ${pitch.fy + pitch.fh} A ${pitch.cornerR} ${pitch.cornerR} 0 0 0 ${pitch.fx + pitch.fw} ${pitch.fy + pitch.fh - pitch.cornerR}`}
-                  fill="none"
-                  stroke={pitch.line}
-                  strokeWidth={1.8}
-                  strokeOpacity={0.82}
+                  strokeWidth={2}
+                  strokeOpacity={0.88}
                 />
               </g>
 
