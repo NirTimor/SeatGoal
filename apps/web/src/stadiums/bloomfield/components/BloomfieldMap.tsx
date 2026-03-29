@@ -12,15 +12,32 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { buildRealBloomfieldData, GATE_POSITIONS } from '../data/stadiumData';
 import type { RealSection, RealSeat } from '../data/stadiumData';
+import {
+  bloomfieldDisplayBlock,
+  bloomfieldGateBadgeLabel,
+  bloomfieldNearestGate,
+  bloomfieldOfficialZone,
+  bloomfieldStandLabelForSection,
+} from '../data/bloomfieldZones';
 
 const ZOOM_ANIM_MS = 420;
-/** Padding around the whole stadium in overview (fraction of union size) */
-const OVERVIEW_PAD_FR = 0.035;
+/** Padding around the whole stadium in overview (fraction of union size) — lower = tighter fit on screen */
+const OVERVIEW_PAD_FR = 0.038;
+/**
+ * Extra horizontal widening after aspect fit (fraction of current width). Narrow viewports need more
+ * world-units left/right so east/west stands stay in frame — otherwise the pitch dominates the strip.
+ */
+const OVERVIEW_PAD_X_EXTRA_FR = 0.1;
+/** Max width of the map column on large screens (stadium feels less “stretched” on wide viewports). */
+const PAGE_MAX_W = 'min(100%, 32rem)';
 /** Padding around a focused section */
 const FOCUS_PAD_FR = 0.14;
 /** After focus, section bbox fills ~this fraction of the map viewport (0.75 = uses ~75% of width/height). */
 const FOCUS_SCREEN_FR = 0.75;
 const FIELD_RECT = { x: 5800, y: 4800, w: 4800, h: 5200 };
+
+const MACCABI_STADIUM_INFO =
+  'https://www.maccabi-tlv.co.il/%D7%94%D7%9E%D7%95%D7%A2%D7%93%D7%95%D7%9F/%D7%94%D7%90%D7%99%D7%A6%D7%98%D7%93%D7%99%D7%95%D7%9F/';
 
 /** Muted display colors — same “families” as source data */
 const FRIENDLY_FILL: Record<string, string> = {
@@ -72,6 +89,12 @@ function expandRect(r: Rect, padFraction: number): Rect {
   return { x: r.x - px, y: r.y - py, w: r.w + 2 * px, h: r.h + 2 * py };
 }
 
+/** Widen rect symmetrically on X only (fraction of width on each side). */
+function expandRectWidthX(r: Rect, padFractionEachSide: number): Rect {
+  const px = r.w * padFractionEachSide;
+  return { x: r.x - px, y: r.y, w: r.w + 2 * px, h: r.h };
+}
+
 function lerpRect(a: Rect, b: Rect, t: number): Rect {
   return {
     x: a.x + (b.x - a.x) * t,
@@ -112,6 +135,27 @@ function clampRectToBounds(r: Rect, bounds: Rect): Rect {
   } else {
     y = Math.max(bounds.y, Math.min(y, bounds.y + bounds.h - h));
   }
+  return { x, y, w, h };
+}
+
+/**
+ * Overview must stay inside the official SVG canvas so every pixel has artwork/background,
+ * and aspect ratio is preserved (letterboxing inside canvas, not outside).
+ */
+function fitOverviewRectInsideFullCanvas(r: Rect, bounds: Rect): Rect {
+  const ar = r.w / r.h;
+  let w = Math.min(r.w, bounds.w);
+  let h = w / ar;
+  if (h > bounds.h) {
+    h = bounds.h;
+    w = h * ar;
+  }
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  let x = cx - w / 2;
+  let y = cy - h / 2;
+  x = Math.max(bounds.x, Math.min(x, bounds.x + bounds.w - w));
+  y = Math.max(bounds.y, Math.min(y, bounds.y + bounds.h - h));
   return { x, y, w, h };
 }
 
@@ -213,6 +257,86 @@ export default function BloomfieldMap() {
   const data = useMemo(() => buildRealBloomfieldData(), []);
   const fullVB = useMemo(() => parseViewBox(data.viewBox), [data.viewBox]);
 
+  const isHe = locale === 'he' || locale.startsWith('he');
+
+  const bloomfieldPitch = useMemo(() => {
+    const fx = FIELD_RECT.x;
+    const fy = FIELD_RECT.y;
+    const fw = FIELD_RECT.w;
+    const fh = FIELD_RECT.h;
+    const grassInset = Math.min(fw, fh) * 0.038;
+    const ix = fx + grassInset;
+    const iy = fy + grassInset;
+    const iw = fw - 2 * grassInset;
+    const ih = fh - 2 * grassInset;
+    const icx = ix + iw / 2;
+    const icy = iy + ih / 2;
+    const line = '#f8fafc';
+    const mPxPerM = Math.min(iw / 105, ih / 68);
+    const centerR = 9.15 * mPxPerM;
+    const rxPenM = (9.15 * iw) / 105;
+    const ryPenM = (9.15 * ih) / 68;
+    const paDepth = (16.5 / 105) * iw;
+    const paSpan = (40.32 / 68) * ih;
+    const gaDepth = (5.5 / 105) * iw;
+    const gaSpan = (18.32 / 68) * ih;
+    const spotD = (11 / 105) * iw;
+    const cR = Math.max(70, 1 * mPxPerM);
+    const innerBoundaryPath = `M ${ix + cR} ${iy} L ${ix + iw - cR} ${iy} A ${cR} ${cR} 0 0 1 ${ix + iw} ${iy + cR} L ${ix + iw} ${iy + ih - cR} A ${cR} ${cR} 0 0 1 ${ix + iw - cR} ${iy + ih} L ${ix + cR} ${iy + ih} A ${cR} ${cR} 0 0 1 ${ix} ${iy + ih - cR} L ${ix} ${iy + cR} A ${cR} ${cR} 0 0 1 ${ix + cR} ${iy} Z`;
+    const gmouthSpan = ih * 0.22;
+    const netDepth = Math.max(40, fw * 0.018);
+    const spotXL = ix + spotD;
+    const spotXR = ix + iw - spotD;
+    const postW = Math.max(8, ih * 0.018);
+    const dxSpotToPaFront = paDepth - spotD;
+    const cosPen = Math.min(1, Math.max(-1, dxSpotToPaFront / rxPenM));
+    const paArcH = ryPenM * Math.sqrt(Math.max(0, 1 - cosPen * cosPen));
+    const paLineLeftX = ix + paDepth;
+    const paLineRightX = ix + iw - paDepth;
+    const penaltyArcLeft = `M ${paLineLeftX} ${icy - paArcH} A ${rxPenM} ${ryPenM} 0 0 1 ${paLineLeftX} ${icy + paArcH}`;
+    const penaltyArcRight = `M ${paLineRightX} ${icy - paArcH} A ${rxPenM} ${ryPenM} 0 0 0 ${paLineRightX} ${icy + paArcH}`;
+    return {
+      fx,
+      fy,
+      fw,
+      fh,
+      ix,
+      iy,
+      iw,
+      ih,
+      icx,
+      icy,
+      line,
+      centerR,
+      paDepth,
+      paSpan,
+      gaDepth,
+      gaSpan,
+      spotD,
+      cR,
+      innerBoundaryPath,
+      gmouthSpan,
+      netDepth,
+      spotXL,
+      spotXR,
+      postW,
+      penaltyArcLeft,
+      penaltyArcRight,
+    };
+  }, []);
+
+  const sectionMapFontSize = (seatCount: number) => {
+    const vbW = fullVB.w;
+    const minFs = vbW * 0.017;
+    const maxFs = vbW * 0.03;
+    const t = (Math.sqrt(Math.max(seatCount, 64)) / 15) * (vbW * 0.00285);
+    return Math.max(minFs, Math.min(maxFs, t));
+  };
+  const gateBadgeFontSize = fullVB.w * 0.0062;
+  const gateBadgePadX = fullVB.w * 0.012;
+  const gateBadgePadY = fullVB.h * 0.022;
+  const standBannerFs = fullVB.w * 0.019;
+
   const [compactVB, setCompactVB] = useState<Rect | null>(null);
   const [currentVB, setCurrentVB] = useState<Rect>(() => fullVB);
   const [mapReady, setMapReady] = useState(false);
@@ -272,11 +396,13 @@ export default function BloomfieldMap() {
       containerRef.current && containerRef.current.clientHeight > 0
         ? containerRef.current.clientWidth / containerRef.current.clientHeight
         : u.w / u.h;
-    const padded = expandRect(matchAspect(u, aspect), OVERVIEW_PAD_FR);
+    let padded = expandRect(matchAspect(u, aspect), OVERVIEW_PAD_FR);
+    padded = expandRectWidthX(padded, OVERVIEW_PAD_X_EXTRA_FR);
+    padded = fitOverviewRectInsideFullCanvas(padded, fullVB);
     setCompactVB(padded);
     setCurrentVB(padded);
     setMapReady(true);
-  }, [data]);
+  }, [data, fullVB]);
 
   const zoomRatio = compactVB ? compactVB.w / currentVB.w : 1;
 
@@ -526,6 +652,29 @@ export default function BloomfieldMap() {
     );
   }, [selectedSection, infoPanelData, data.sections]);
 
+  const panelZone = useMemo(() => {
+    if (!panelSection) return null;
+    return bloomfieldOfficialZone(panelSection);
+  }, [panelSection]);
+
+  const panelGate = useMemo(() => {
+    if (!panelSection) return null;
+    return bloomfieldNearestGate(panelSection);
+  }, [panelSection]);
+
+  const panelSeatGrid = useMemo(() => {
+    if (!panelSection || panelGate === null) return null;
+    const primarySeat = selectedSeats.length > 0 ? selectedSeats[selectedSeats.length - 1]! : null;
+    const pl = primarySeat ? seatLabels.get(seatKey(primarySeat)) : null;
+    return [
+      { lab: isHe ? 'אזור' : 'Section', val: panelSection.name },
+      { lab: isHe ? 'בלוק' : 'Block', val: bloomfieldDisplayBlock(panelSection) },
+      { lab: isHe ? 'שורה' : 'Row', val: pl ? String(pl.row) : '—' },
+      { lab: isHe ? 'מושב' : 'Seat', val: pl ? String(pl.seat) : '—' },
+      { lab: isHe ? 'שער קרוב' : 'Nearest gate', val: String(panelGate) },
+    ];
+  }, [panelSection, panelGate, selectedSeats, seatLabels, isHe]);
+
   const purchaseQuery = useMemo(() => {
     if (!panelSection || selectedSeats.length === 0) return '';
     const q = new URLSearchParams();
@@ -579,23 +728,46 @@ export default function BloomfieldMap() {
 
   return (
     <>
-      <div className="flex flex-col w-full min-h-0 h-[100dvh] bg-[#eef1f6] text-slate-800 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 bg-white/90 border-b border-slate-200/80 shadow-sm backdrop-blur-sm flex-shrink-0">
-          <h1 className="text-base font-semibold tracking-tight text-slate-800">Bloomfield Stadium</h1>
-          <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 tabular-nums">
-            <span title={locale === 'he' ? 'יחס תצוגה ביחס לתצוגה מלאה' : 'Zoom vs overview'}>
-              {pctLabel}%
-            </span>
+      <div
+        className="flex min-h-[100dvh] min-h-[100svh] w-full flex-col items-center justify-center overflow-hidden text-slate-900"
+        style={{ colorScheme: 'light', backgroundColor: '#d8dee8' }}
+      >
+        <div
+          className="flex min-h-0 shrink-0 flex-col overflow-hidden self-center shadow-[0_0_0_1px_rgba(148,163,184,0.35)]"
+          style={{
+            width: PAGE_MAX_W,
+            maxWidth: '32rem',
+            marginInline: 'auto',
+            height: 'min(92dvh, 92svh)',
+            maxHeight: 'min(100dvh, 100svh)',
+            backgroundColor: '#e8ecf4',
+          }}
+        >
+        <div
+          className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2.5 shadow-sm"
+          style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+        >
+          <div className="min-w-0 pr-3">
+            <h1 className="text-base font-semibold tracking-tight text-slate-900">
+              {isHe ? 'אצטדיון בלומפילד' : 'Bloomfield Stadium'}
+            </h1>
+            <p className="truncate text-[11px] font-medium text-slate-500 sm:text-xs">
+              {isHe ? 'בית מכבי תל אביב · כ־30,000 מושבים · נפתח מחדש 2019' : 'Maccabi Tel Aviv · ~30,000 seats · reopened 2019'}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 text-xs tabular-nums text-slate-500 sm:text-sm">
+            <span title={isHe ? 'יחס תצוגה ביחס לתצוגה מלאה' : 'Zoom vs overview'}>{pctLabel}%</span>
             <span className="text-slate-300">·</span>
             <span>
-              {data.totalSeats.toLocaleString()} {locale === 'he' ? 'מושבים' : 'seats'}
+              {data.totalSeats.toLocaleString()} {isHe ? 'מושבים' : 'seats'}
             </span>
           </div>
         </div>
 
         <div
           ref={containerRef}
-          className={`flex-1 min-h-0 relative overflow-hidden bg-[#e4e9f2] transition-opacity duration-150 ${mapReady ? 'cursor-grab active:cursor-grabbing opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`relative min-h-0 flex-1 overflow-hidden transition-opacity duration-150 ${mapReady ? 'cursor-grab opacity-100 active:cursor-grabbing' : 'pointer-events-none opacity-0'}`}
+          style={{ backgroundColor: '#dce3ee' }}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -609,8 +781,8 @@ export default function BloomfieldMap() {
             <>
               <button
                 type="button"
-                className="absolute top-0 bottom-24 left-0 z-[21] w-[min(4rem,14vw)] cursor-pointer border-0 bg-slate-900/15 transition hover:bg-slate-900/25"
-                aria-label={locale === 'he' ? 'חזרה לאצטדיון מלא' : 'Back to full stadium'}
+                className="absolute bottom-24 left-0 top-0 z-[21] w-[min(4rem,14vw)] cursor-pointer border-0 bg-slate-900/15 transition hover:bg-slate-900/25"
+                aria-label={isHe ? 'חזרה לאצטדיון מלא' : 'Back to full stadium'}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   exitToOverview();
@@ -618,8 +790,8 @@ export default function BloomfieldMap() {
               />
               <button
                 type="button"
-                className="absolute top-0 bottom-24 right-0 z-[21] w-[min(4rem,14vw)] cursor-pointer border-0 bg-slate-900/15 transition hover:bg-slate-900/25"
-                aria-label={locale === 'he' ? 'חזרה לאצטדיון מלא' : 'Back to full stadium'}
+                className="absolute bottom-24 right-0 top-0 z-[21] w-[min(4rem,14vw)] cursor-pointer border-0 bg-slate-900/15 transition hover:bg-slate-900/25"
+                aria-label={isHe ? 'חזרה לאצטדיון מלא' : 'Back to full stadium'}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   exitToOverview();
@@ -630,59 +802,284 @@ export default function BloomfieldMap() {
           <svg
             ref={svgRef}
             viewBox={rectToVB(currentVB)}
-            className="w-full h-full max-w-full max-h-full drop-shadow-sm block"
+            className="block h-full w-full max-h-full max-w-full drop-shadow-sm"
             preserveAspectRatio="xMidYMid meet"
+            style={{ backgroundColor: '#e5eaf2' }}
+            role="img"
+            aria-label={isHe ? 'מפת אצטדיון בלומפילד' : 'Bloomfield Stadium seat map'}
           >
             <defs>
-              <linearGradient id="bloomfield-grass" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6cbd6e" />
-                <stop offset="100%" stopColor="#4a9d55" />
+              <linearGradient id="bloomfield-grass-c" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#4faa56" />
+                <stop offset="45%" stopColor="#3d9142" />
+                <stop offset="100%" stopColor="#2d722f" />
               </linearGradient>
+              <pattern
+                id="bloomfield-grass-stripes"
+                width={56}
+                height={56}
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(6)"
+              >
+                <rect width={56} height={56} fill="#000" fillOpacity={0} />
+                <line x1={0} y1={0} x2={56} y2={0} stroke="#000" strokeWidth={16} strokeOpacity={0.035} />
+              </pattern>
               <filter id="section-depth" x="-8%" y="-8%" width="116%" height="116%">
                 <feDropShadow dx="0" dy="10" stdDeviation="14" floodColor="#1e293b" floodOpacity="0.11" />
               </filter>
             </defs>
-            <rect x="2293" y="1644" width="11833" height="11483" fill="#e8ecf2" />
+            <rect
+              x={currentVB.x}
+              y={currentVB.y}
+              width={currentVB.w}
+              height={currentVB.h}
+              fill="#e4e9f0"
+            />
 
             <ellipse
               cx={data.fieldCenter.x}
               cy={data.fieldCenter.y}
               rx={6200}
               ry={5800}
-              fill="#cfd8e6"
-              fillOpacity={0.45}
-              stroke="#c5ced9"
-              strokeWidth="6"
+              fill="#d1dae8"
+              fillOpacity={0.4}
+              stroke="#b8c4d4"
+              strokeWidth="5"
             />
 
-            <rect
-              x="5800"
-              y="4800"
-              width="4800"
-              height="5200"
-              rx="88"
-              fill="url(#bloomfield-grass)"
-              stroke="#3d7a46"
-              strokeWidth="6"
-            />
-            <rect
-              x="5800"
-              y="4800"
-              width="4800"
-              height="5200"
-              rx="88"
-              fill="none"
-              stroke="#e8f5e9"
-              strokeWidth="3"
-              strokeOpacity={0.9}
-            />
-            <line x1="8200" y1="4800" x2="8200" y2="10000" stroke="#e8f5e9" strokeWidth="3" strokeOpacity={0.85} />
-            <circle cx="8200" cy="7400" r="500" fill="none" stroke="#e8f5e9" strokeWidth="3" strokeOpacity={0.85} />
-            <circle cx="8200" cy="7400" r="8" fill="#e8f5e9" fillOpacity={0.95} />
-            <rect x="5800" y="6200" width="800" height="2400" fill="none" stroke="#e8f5e9" strokeWidth="2" strokeOpacity={0.75} />
-            <rect x="9800" y="6200" width="800" height="2400" fill="none" stroke="#e8f5e9" strokeWidth="2" strokeOpacity={0.75} />
-            <rect x="5800" y="6800" width="350" height="1200" fill="none" stroke="#e8f5e9" strokeWidth="2" strokeOpacity={0.75} />
-            <rect x="10250" y="6800" width="350" height="1200" fill="none" stroke="#e8f5e9" strokeWidth="2" strokeOpacity={0.75} />
+            <g id="bloomfield-pitch-fifa">
+              <rect
+                x={bloomfieldPitch.fx}
+                y={bloomfieldPitch.fy}
+                width={bloomfieldPitch.fw}
+                height={bloomfieldPitch.fh}
+                rx={88}
+                fill="url(#bloomfield-grass-c)"
+                stroke="#1b4d18"
+                strokeWidth={5}
+              />
+              <rect
+                x={bloomfieldPitch.fx}
+                y={bloomfieldPitch.fy}
+                width={bloomfieldPitch.fw}
+                height={bloomfieldPitch.fh}
+                rx={88}
+                fill="url(#bloomfield-grass-stripes)"
+              />
+              <path
+                d={bloomfieldPitch.innerBoundaryPath}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={3}
+                strokeOpacity={0.94}
+                strokeLinejoin="round"
+              />
+              <g opacity={0.96}>
+                <rect
+                  x={bloomfieldPitch.ix - bloomfieldPitch.netDepth}
+                  y={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  width={bloomfieldPitch.netDepth}
+                  height={bloomfieldPitch.gmouthSpan}
+                  rx={4}
+                  fill="#d4dde8"
+                  stroke="#94a3b8"
+                  strokeWidth={2}
+                />
+                <rect
+                  x={bloomfieldPitch.ix + bloomfieldPitch.iw}
+                  y={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  width={bloomfieldPitch.netDepth}
+                  height={bloomfieldPitch.gmouthSpan}
+                  rx={4}
+                  fill="#d4dde8"
+                  stroke="#94a3b8"
+                  strokeWidth={2}
+                />
+                <line
+                  x1={bloomfieldPitch.ix - bloomfieldPitch.netDepth}
+                  y1={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  x2={bloomfieldPitch.ix + bloomfieldPitch.netDepth * 0.15}
+                  y2={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  stroke={bloomfieldPitch.line}
+                  strokeWidth={Math.max(10, bloomfieldPitch.postW)}
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={bloomfieldPitch.ix - bloomfieldPitch.netDepth}
+                  y1={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                  x2={bloomfieldPitch.ix + bloomfieldPitch.netDepth * 0.15}
+                  y2={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                  stroke={bloomfieldPitch.line}
+                  strokeWidth={Math.max(10, bloomfieldPitch.postW)}
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={bloomfieldPitch.ix + bloomfieldPitch.iw - bloomfieldPitch.netDepth * 0.15}
+                  y1={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  x2={bloomfieldPitch.ix + bloomfieldPitch.iw + bloomfieldPitch.netDepth}
+                  y2={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                  stroke={bloomfieldPitch.line}
+                  strokeWidth={Math.max(10, bloomfieldPitch.postW)}
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={bloomfieldPitch.ix + bloomfieldPitch.iw - bloomfieldPitch.netDepth * 0.15}
+                  y1={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                  x2={bloomfieldPitch.ix + bloomfieldPitch.iw + bloomfieldPitch.netDepth}
+                  y2={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                  stroke={bloomfieldPitch.line}
+                  strokeWidth={Math.max(10, bloomfieldPitch.postW)}
+                  strokeLinecap="round"
+                />
+              </g>
+              <line
+                x1={bloomfieldPitch.icx}
+                y1={bloomfieldPitch.iy}
+                x2={bloomfieldPitch.icx}
+                y2={bloomfieldPitch.iy + bloomfieldPitch.ih}
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2.6}
+                strokeOpacity={0.9}
+              />
+              <circle
+                cx={bloomfieldPitch.icx}
+                cy={bloomfieldPitch.icy}
+                r={bloomfieldPitch.centerR}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2.6}
+                strokeOpacity={0.88}
+              />
+              <rect
+                x={bloomfieldPitch.ix}
+                y={bloomfieldPitch.icy - bloomfieldPitch.paSpan / 2}
+                width={bloomfieldPitch.paDepth}
+                height={bloomfieldPitch.paSpan}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2.4}
+                strokeOpacity={0.88}
+              />
+              <rect
+                x={bloomfieldPitch.ix + bloomfieldPitch.iw - bloomfieldPitch.paDepth}
+                y={bloomfieldPitch.icy - bloomfieldPitch.paSpan / 2}
+                width={bloomfieldPitch.paDepth}
+                height={bloomfieldPitch.paSpan}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2.4}
+                strokeOpacity={0.88}
+              />
+              <rect
+                x={bloomfieldPitch.ix}
+                y={bloomfieldPitch.icy - bloomfieldPitch.gaSpan / 2}
+                width={bloomfieldPitch.gaDepth}
+                height={bloomfieldPitch.gaSpan}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2}
+                strokeOpacity={0.82}
+              />
+              <rect
+                x={bloomfieldPitch.ix + bloomfieldPitch.iw - bloomfieldPitch.gaDepth}
+                y={bloomfieldPitch.icy - bloomfieldPitch.gaSpan / 2}
+                width={bloomfieldPitch.gaDepth}
+                height={bloomfieldPitch.gaSpan}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2}
+                strokeOpacity={0.82}
+              />
+              <line
+                x1={bloomfieldPitch.ix}
+                y1={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                x2={bloomfieldPitch.ix}
+                y2={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                stroke={bloomfieldPitch.line}
+                strokeWidth={10}
+                strokeLinecap="round"
+                strokeOpacity={0.95}
+              />
+              <line
+                x1={bloomfieldPitch.ix + bloomfieldPitch.iw}
+                y1={bloomfieldPitch.icy - bloomfieldPitch.gmouthSpan / 2}
+                x2={bloomfieldPitch.ix + bloomfieldPitch.iw}
+                y2={bloomfieldPitch.icy + bloomfieldPitch.gmouthSpan / 2}
+                stroke={bloomfieldPitch.line}
+                strokeWidth={10}
+                strokeLinecap="round"
+                strokeOpacity={0.95}
+              />
+              <circle cx={bloomfieldPitch.spotXL} cy={bloomfieldPitch.icy} r={8} fill={bloomfieldPitch.line} fillOpacity={0.95} />
+              <circle cx={bloomfieldPitch.spotXR} cy={bloomfieldPitch.icy} r={8} fill={bloomfieldPitch.line} fillOpacity={0.95} />
+              <path
+                d={bloomfieldPitch.penaltyArcLeft}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2}
+                strokeOpacity={0.86}
+              />
+              <path
+                d={bloomfieldPitch.penaltyArcRight}
+                fill="none"
+                stroke={bloomfieldPitch.line}
+                strokeWidth={2}
+                strokeOpacity={0.86}
+              />
+            </g>
+
+            <g
+              id="bloomfield-stand-names"
+              style={{ pointerEvents: 'none' }}
+              opacity={showSparseLabels ? 0.55 : 0.35}
+            >
+              <text
+                x={8200}
+                y={1920}
+                textAnchor="middle"
+                fill="#475569"
+                fontSize={standBannerFs}
+                fontWeight="700"
+                fontFamily="system-ui,Segoe UI,sans-serif"
+              >
+                {isHe ? 'יציע מערבי' : 'West stand'}
+              </text>
+              <text
+                x={8200}
+                y={12720}
+                textAnchor="middle"
+                fill="#475569"
+                fontSize={standBannerFs}
+                fontWeight="700"
+                fontFamily="system-ui,Segoe UI,sans-serif"
+              >
+                {isHe ? 'יציע מזרחי · ש׳ 7–8' : 'East · gates 7–8'}
+              </text>
+              <text
+                x={2640}
+                y={7450}
+                textAnchor="middle"
+                transform="rotate(-90 2640 7450)"
+                fill="#475569"
+                fontSize={standBannerFs * 0.92}
+                fontWeight="700"
+                fontFamily="system-ui,Segoe UI,sans-serif"
+              >
+                {isHe ? 'יציע דרומי · ש׳ 10–11' : 'South · gates 10–11'}
+              </text>
+              <text
+                x={13660}
+                y={7450}
+                textAnchor="middle"
+                transform="rotate(90 13660 7450)"
+                fill="#475569"
+                fontSize={standBannerFs * 0.92}
+                fontWeight="700"
+                fontFamily="system-ui,Segoe UI,sans-serif"
+              >
+                {isHe ? 'שערים 4 · 5' : 'Gates 4 · 5'}
+              </text>
+            </g>
 
             <g filter="url(#section-depth)">
               {data.sections.map((section) => {
@@ -717,8 +1114,7 @@ export default function BloomfieldMap() {
             {data.sections.map((section) => {
               if (section.seatCount < 30) return null;
               if (!showSparseLabels && section.idx !== selectedSection) return null;
-              const sizeScale = Math.sqrt(section.seatCount) / 15;
-              const fontSize = Math.max(60, Math.min(180, sizeScale * 100));
+              const fontSize = sectionMapFontSize(section.seatCount);
               return (
                 <text
                   key={`label-${section.idx}`}
@@ -727,13 +1123,13 @@ export default function BloomfieldMap() {
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fill="#1e293b"
-                  fillOpacity={0.78}
+                  fillOpacity={0.82}
                   stroke="#ffffff"
                   strokeWidth={fontSize * 0.06}
                   strokeOpacity={0.55}
                   paintOrder="stroke fill"
                   fontSize={fontSize}
-                  fontWeight="600"
+                  fontWeight="700"
                   fontFamily="system-ui, Segoe UI, Arial, sans-serif"
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >
@@ -769,28 +1165,45 @@ export default function BloomfieldMap() {
                 );
               })}
 
-            {GATE_POSITIONS.map(({ gate, x, y, label }) => (
+            {GATE_POSITIONS.map(({ gate, x, y }) => (
               <g key={gate}>
-                <rect x={x - 250} y={y - 80} width={500} height={160} rx={36} fill="#475569" fillOpacity={0.92} />
+                <rect
+                  x={x - gateBadgePadX}
+                  y={y - gateBadgePadY / 2}
+                  width={gateBadgePadX * 2}
+                  height={gateBadgePadY}
+                  rx={fullVB.w * 0.0016}
+                  fill="#1e293b"
+                  fillOpacity={0.96}
+                />
                 <text
                   x={x}
-                  y={y + 20}
+                  y={y + gateBadgeFontSize * 0.28}
                   textAnchor="middle"
                   fill="#f8fafc"
-                  fontSize={88}
-                  fontWeight="600"
-                  fontFamily="system-ui,Segoe UI,sans-serif"
+                  fontSize={gateBadgeFontSize}
+                  fontWeight="800"
+                  fontFamily="system-ui,Segoe UI,Arial,sans-serif"
                   style={{ pointerEvents: 'none' }}
                 >
-                  {label}
+                  {bloomfieldGateBadgeLabel(gate, isHe)}
                 </text>
               </g>
             ))}
 
             <g>
-              <rect x={8800} y={2050} width={400} height={150} rx={36} fill="#475569" fillOpacity={0.92} />
-              <text x={9000} y={2150} textAnchor="middle" fill="#f8fafc" fontSize={88} fontWeight="600" fontFamily="system-ui,Segoe UI,sans-serif" style={{ pointerEvents: 'none' }}>
-                VIP
+              <rect x={8620} y={1980} width={760} height={168} rx={40} fill="#1e293b" fillOpacity={0.94} />
+              <text
+                x={9000}
+                y={2095}
+                textAnchor="middle"
+                fill="#fef9c3"
+                fontSize={gateBadgeFontSize * 1.05}
+                fontWeight="800"
+                fontFamily="system-ui,Segoe UI,sans-serif"
+                style={{ pointerEvents: 'none' }}
+              >
+                {isHe ? 'VIP · תאי צפייה' : 'VIP · boxes'}
               </text>
             </g>
           </svg>
@@ -808,65 +1221,108 @@ export default function BloomfieldMap() {
             </button>
             <div className="w-px h-6 bg-slate-200 mx-0.5" />
             <button type="button" onClick={resetView} className="px-2.5 h-8 flex items-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
-              {locale === 'he' ? 'הכל' : 'All'}
+              {isHe ? 'איפוס' : 'Reset'}
             </button>
           </div>
 
-          {hoveredSection !== null && !panelSection && (
-            <div className="absolute top-3 start-3 bg-white/95 border border-slate-200 rounded-lg px-3 py-1.5 z-20 pointer-events-none text-xs text-slate-700 shadow-md">
-              {locale === 'he' ? 'אזור' : 'Section'} {data.sections.find((s) => s.idx === hoveredSection)?.name} (
-              {data.sections.find((s) => s.idx === hoveredSection)?.seatCount}{' '}
-              {locale === 'he' ? 'מושבים' : 'seats'})
-            </div>
-          )}
+          {hoveredSection !== null && !panelSection && (() => {
+            const hs = data.sections.find((s) => s.idx === hoveredSection);
+            const zone = hs ? bloomfieldOfficialZone(hs) : null;
+            return (
+              <div className="pointer-events-none absolute start-3 top-3 z-20 max-w-[min(20rem,calc(100vw-24px))] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-800 shadow-md">
+                <div className="font-bold text-slate-900">
+                  {hs?.name} ·{' '}
+                  {hs?.seatCount.toLocaleString()} {isHe ? 'מושבים' : 'seats'}
+                </div>
+                {zone && (
+                  <div className="mt-1 text-[11px] font-medium leading-snug text-slate-600">
+                    {isHe ? zone.titleHe : zone.titleEn}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
         </div>
       </div>
 
       {panelSection && (
         <aside
-          className="overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl backdrop-blur-sm p-0 sm:rounded-[1.25rem] [&_a]:no-underline"
+          className="overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl p-0 shadow-xl backdrop-blur-sm sm:rounded-[1.25rem] [&_a]:no-underline"
           style={selectionPanelStyle}
-          dir={locale === 'he' || locale.startsWith('he') ? 'rtl' : 'ltr'}
+          dir={isHe ? 'rtl' : 'ltr'}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           role="complementary"
-          aria-label={locale === 'he' ? 'סל בחירה — Bloomfield' : 'Selection — Bloomfield'}
+          aria-label={isHe ? 'סל בחירה — בלומפילד' : 'Selection — Bloomfield'}
         >
-          <div className="h-1.5 rounded-t-2xl bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500 sm:rounded-t-[1.25rem]" aria-hidden />
-
-          <div className="p-4 sm:p-5">
-            <div className="mb-4">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-teal-800/80">
-                {locale === 'he' ? 'בחירת מושבים' : 'Seat selection'}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="inline-flex max-w-full min-w-0 items-center break-words rounded-lg px-3 py-1 text-lg font-bold leading-snug tabular-nums shadow-md shadow-teal-900/25"
-                  style={{ backgroundColor: '#0f766e', color: '#ffffff' }}
-                >
-                  {panelSection.name}
-                </span>
-                <span className="text-xs font-medium capitalize text-slate-800">{panelSection.stand}</span>
+          <div
+            className="rounded-t-2xl border-b border-amber-900/15 bg-gradient-to-l from-amber-100 via-yellow-50 to-amber-50 px-4 py-3.5 sm:rounded-t-[1.25rem]"
+            aria-hidden
+          >
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-900/60">
+              {isHe ? 'בחירת מושבים' : 'Seat selection'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span
+                className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white shadow-sm"
+                style={{ backgroundColor: friendlyFill(panelSection.fill) }}
+              />
+              <div className="min-w-0">
+                <div className="text-lg font-bold leading-snug text-slate-900">{panelSection.name}</div>
+                <div className="text-xs font-semibold text-slate-600">
+                  {bloomfieldStandLabelForSection(panelSection, isHe)}
+                </div>
               </div>
             </div>
+            {panelZone && (
+              <p className="mt-2 text-[13px] font-bold leading-snug text-amber-950/90">
+                {isHe ? panelZone.titleHe : panelZone.titleEn}
+              </p>
+            )}
+          </div>
 
-            <dl className="space-y-0 rounded-xl border border-slate-200/90 bg-white/70 text-sm shadow-inner shadow-slate-900/5">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5">
-                <dt className="text-slate-500">{locale === 'he' ? 'יציע' : 'Stand'}</dt>
-                <dd className="font-semibold capitalize text-slate-800">{panelSection.stand}</dd>
+          <div className="border-t border-slate-200/80 bg-white px-4 py-4 sm:px-5">
+            {panelSeatGrid && (
+              <div className="mb-4 grid grid-cols-5 gap-0.5 border-b border-slate-200 pb-4 text-center sm:gap-1">
+                {panelSeatGrid.map((c) => (
+                  <div key={c.lab} className="min-w-0 px-0.5">
+                    <div className="mb-1 text-[10px] font-medium leading-tight text-slate-500 sm:text-[11px]">{c.lab}</div>
+                    <div className="truncate text-sm font-extrabold tabular-nums text-slate-900 sm:text-base">{c.val}</div>
+                  </div>
+                ))}
               </div>
+            )}
+
+            {panelZone && (
+              <p className="mb-4 text-[13px] leading-relaxed text-slate-600">
+                {isHe ? panelZone.blurbHe : panelZone.blurbEn}
+              </p>
+            )}
+
+            <a
+              href={MACCABI_STADIUM_INFO}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-4 flex items-center justify-center gap-1 rounded-lg border border-amber-200/90 bg-amber-50/90 py-2 text-center text-xs font-semibold text-amber-950/90 transition hover:bg-amber-100"
+            >
+              {isHe ? 'מידע נוסף באתר מכבי ת״א' : 'More on Maccabi TLV website'}
+              <span aria-hidden>↗</span>
+            </a>
+
+            <dl className="mb-1 space-y-0 rounded-xl border border-slate-200/90 bg-slate-50/80 text-sm shadow-inner shadow-slate-900/5">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5">
-                <dt className="text-slate-500 shrink-0">{locale === 'he' ? 'צבע האזור' : 'Zone color'}</dt>
-                <dd className="flex items-center gap-2 min-w-0">
+                <dt className="text-slate-500">{isHe ? 'צבע האזור' : 'Zone color'}</dt>
+                <dd className="flex min-w-0 items-center gap-2">
                   <span
                     className="h-5 w-5 shrink-0 rounded-full ring-2 ring-white shadow ring-offset-1 ring-offset-slate-100"
                     style={{ backgroundColor: friendlyFill(panelSection.fill) }}
                   />
-                  <span className="font-mono text-xs text-slate-600 truncate">{friendlyFill(panelSection.fill)}</span>
+                  <span className="truncate font-mono text-xs text-slate-600">{friendlyFill(panelSection.fill)}</span>
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <dt className="text-slate-500">{locale === 'he' ? 'מושבים באזור' : 'Capacity'}</dt>
+                <dt className="text-slate-500">{isHe ? 'מושבים בגוש' : 'Seats in block'}</dt>
                 <dd className="font-bold tabular-nums text-slate-900">{panelSection.seatCount.toLocaleString()}</dd>
               </div>
             </dl>
@@ -875,7 +1331,7 @@ export default function BloomfieldMap() {
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                    {locale === 'he' ? 'הבחירה שלכם' : 'Your picks'}{' '}
+                    {isHe ? 'הבחירה שלכם' : 'Your picks'}{' '}
                     <span className="tabular-nums text-teal-700">({selectedSeats.length})</span>
                   </h4>
                   <button
@@ -886,17 +1342,17 @@ export default function BloomfieldMap() {
                       setSelectedSeats([]);
                     }}
                   >
-                    {locale === 'he' ? 'נקה הכל' : 'Clear all'}
+                    {isHe ? 'נקה הכל' : 'Clear all'}
                   </button>
                 </div>
                 <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-0.5">
                   {selectedSeats.map((s) => {
                     const lbl = seatLabels.get(seatKey(s));
                     const label = lbl
-                      ? locale === 'he'
+                      ? isHe
                         ? `שורה ${lbl.row} · מושב ${lbl.seat}`
                         : `Row ${lbl.row} · Seat ${lbl.seat}`
-                      : locale === 'he'
+                      : isHe
                         ? 'מושב במפה'
                         : 'Map seat';
                     return (
@@ -904,11 +1360,11 @@ export default function BloomfieldMap() {
                         key={seatKey(s)}
                         className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
                       >
-                        <span className="font-medium tabular-nums min-w-0 truncate">{label}</span>
+                        <span className="min-w-0 truncate font-medium tabular-nums">{label}</span>
                         <button
                           type="button"
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-lg text-slate-500 transition hover:bg-rose-100 hover:text-rose-700"
-                          aria-label={locale === 'he' ? 'הסר מושב' : 'Remove seat'}
+                          aria-label={isHe ? 'הסר מושב' : 'Remove seat'}
                           onClick={(e) => {
                             e.stopPropagation();
                             const k = seatKey(s);
@@ -922,7 +1378,7 @@ export default function BloomfieldMap() {
                   })}
                 </ul>
                 <p className="text-[11px] leading-snug text-slate-500">
-                  {locale === 'he'
+                  {isHe
                     ? 'מספור שורות מאוחד גם כשיש רווח באמצע אותה שורה במפה.'
                     : 'Row numbers treat one curved row with a gap as a single row.'}
                 </p>
@@ -930,7 +1386,7 @@ export default function BloomfieldMap() {
                   href={`/${locale}/events${purchaseQuery ? `?${purchaseQuery}` : ''}`}
                   className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-teal-900/25 transition hover:from-teal-500 hover:to-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2"
                 >
-                  {locale === 'he' ? 'המשך לרכישה' : 'Continue to purchase'}
+                  {isHe ? 'המשך לרכישה' : 'Continue to purchase'}
                 </Link>
               </div>
             )}
@@ -938,12 +1394,12 @@ export default function BloomfieldMap() {
             {showSeats && selectedSeats.length === 0 && (
               <div className="mt-4 space-y-2 rounded-xl bg-slate-100/90 px-3 py-3 text-center text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
                 <p>
-                  {locale === 'he'
+                  {isHe
                     ? 'לחצו על הנקודות על המפה — אפשר לבחור כמה מושבים.'
                     : 'Tap dots on the map — you can select multiple seats.'}
                 </p>
                 <p className="text-[11px] font-normal text-slate-500">
-                  {locale === 'he'
+                  {isHe
                     ? 'Esc או לחיצה בפס הצדדיים מחזירים לתצוגת אצטדיון מלא.'
                     : 'Esc or the side strips return to the full stadium view.'}
                 </p>
@@ -955,7 +1411,7 @@ export default function BloomfieldMap() {
               onClick={clearSelection}
               className="mt-5 w-full rounded-xl border-2 border-slate-800 bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
             >
-              {locale === 'he' ? 'סגור' : 'Close'}
+              {isHe ? 'סגור' : 'Close'}
             </button>
           </div>
         </aside>
